@@ -1,5 +1,141 @@
+
 @import "tailwindcss";
 
+/* Enable class-based dark mode */
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* FixMate design tokens */
+:root {
+  color-scheme: light;
+
+  /* Brand colors */
+  --primary: #167d68;
+  --primary-hover: #126653;
+  --primary-foreground: #ffffff;
+  --secondary: #b9e769;
+  --accent: #e8f5d5;
+
+  /* Backgrounds and surfaces */
+  --background: #f5f7f2;
+  --surface: #ffffff;
+  --surface-secondary: #edf2eb;
+  --surface-hover: #e8efe6;
+
+  /* Text */
+  --foreground: #18352e;
+  --muted: #71827a;
+  --muted-foreground: #87958d;
+
+  /* Borders and states */
+  --border: #dfe8df;
+  --input: #d5e1d8;
+  --ring: #167d68;
+  --success: #16845b;
+  --warning: #d99a27;
+  --danger: #dc5757;
+
+  /* Effects */
+  --shadow-color: 22 55 43;
+  --card-shadow: 0 8px 30px rgb(22 55 43 / 6%);
+  --navbar-shadow: 0 4px 24px rgb(22 55 43 / 5%);
+
+  /* Shape */
+  --radius: 0.875rem;
+}
+
+/* Dark theme */
+.dark {
+  color-scheme: dark;
+
+  --primary: #5ad6ad;
+  --primary-hover: #7ae5c0;
+  --primary-foreground: #10231d;
+  --secondary: #b9e769;
+  --accent: #233d32;
+
+  --background: #101f1c;
+  --surface: #1b302b;
+  --surface-secondary: #223a33;
+  --surface-hover: #29443a;
+
+  --foreground: #f2f7f2;
+  --muted: #b0c5bb;
+  --muted-foreground: #8da69a;
+
+  --border: #30483e;
+  --input: #3b574a;
+  --ring: #5ad6ad;
+  --success: #5ad6ad;
+  --warning: #f0bd61;
+  --danger: #ff8585;
+
+  --shadow-color: 0 0 0;
+  --card-shadow: 0 8px 30px rgb(0 0 0 / 20%);
+  --navbar-shadow: 0 4px 24px rgb(0 0 0 / 15%);
+}
+
+/* Expose tokens as Tailwind utilities */
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-accent: var(--accent);
+
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-secondary: var(--surface-secondary);
+  --color-surface-hover: var(--surface-hover);
+
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+
+  --radius-card: var(--radius);
+}
+
+/* Global base styles */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), sans-serif;
+  transition:
+    background-color 200ms ease,
+    color 200ms ease;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  cursor: pointer;
+}
+
+::selection {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
 
 

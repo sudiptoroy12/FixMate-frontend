@@ -15,6 +15,7 @@ import {
   Settings,
   Home,
   Info,
+  Smartphone,
 } from "lucide-react";
 
 import { authClient } from "@/lib/auth-client";
@@ -22,7 +23,7 @@ import ThemeToggle from "../theme/ThemeToggle";
 
 const navLinks = [
   { label: "Home", href: "/", icon: Home },
-  { label: "Services", href: "/services" },
+  { label: "Services", href: "/services", icon: Smartphone },
   { label: "About", href: "/about", icon: Info },
 ];
 
@@ -38,7 +39,6 @@ const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
-  // Better Auth session
   const { data: session, isPending } = authClient.useSession();
 
   const user = session?.user;
@@ -53,28 +53,23 @@ const Navbar = () => {
   const userName = user?.name || "User";
   const userImage = user?.image;
 
-  // Close menus
   const closeMenus = () => {
     setMobileMenuOpen(false);
     setProfileMenuOpen(false);
   };
 
-  // Active route detection
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
-
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
-  // Navigation styles
   const getNavClass = (active: boolean) =>
-    `flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-200 ${
+    `flex items-center gap-2.5 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-200 ${
       active
-        ? "bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400"
-        : "text-gray-600 hover:bg-gray-100 hover:text-blue-600 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-blue-400"
+        ? "bg-accent text-primary"
+        : "text-muted hover:bg-surface-secondary hover:text-primary"
     }`;
 
-  // Sign out
   const handleSignOut = async () => {
     try {
       await authClient.signOut();
@@ -85,25 +80,22 @@ const Navbar = () => {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/95 shadow-sm backdrop-blur-md dark:border-gray-800 dark:bg-gray-950/95">
-
-      {/* Main Navbar */}
-      <div className="mx-auto flex min-h-[72px] max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/90 shadow-sm backdrop-blur-xl">
+      <div className="mx-auto flex min-h-[76px] max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
 
         {/* Logo */}
         <Link
           href="/"
           onClick={closeMenus}
-          className="group flex shrink-0 items-center gap-2.5"
           aria-label="FixMate home"
+          className="group flex shrink-0 items-center gap-3"
         >
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md transition-all duration-300 group-hover:rotate-6 group-hover:scale-105 sm:h-11 sm:w-11">
-            <Wrench size={25} strokeWidth={2.2} />
+          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20 transition duration-300 group-hover:-rotate-6 group-hover:scale-105">
+            <Wrench size={23} strokeWidth={2.4} />
           </span>
 
-          <span className="text-xl font-extrabold tracking-tight text-gray-900 dark:text-white sm:text-2xl">
-            Fix
-            <span className="text-blue-600">Mate</span>
+          <span className="text-[23px] font-extrabold tracking-tight text-foreground">
+            Fix<span className="text-primary">Mate</span>
           </span>
         </Link>
 
@@ -114,6 +106,7 @@ const Navbar = () => {
         >
           {navLinks.map((link) => {
             const active = isActive(link.href);
+            const Icon = link.icon;
 
             return (
               <Link
@@ -123,6 +116,7 @@ const Navbar = () => {
                 aria-current={active ? "page" : undefined}
                 className={getNavClass(active)}
               >
+                <Icon size={17} strokeWidth={2} />
                 {link.label}
               </Link>
             );
@@ -131,59 +125,54 @@ const Navbar = () => {
 
         {/* Desktop Actions */}
         <div className="hidden shrink-0 items-center gap-3 md:flex">
-
-          {/* Theme Toggle */}
           <ThemeToggle />
 
-          {/* Logged Out */}
           {!isPending && !user && (
             <>
               <Link
                 href="/signin"
-                className="rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-100 hover:text-blue-600 dark:text-gray-200 dark:hover:bg-gray-800 dark:hover:text-blue-400"
+                className="rounded-xl px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-surface-secondary"
               >
                 Sign In
               </Link>
 
               <Link
                 href="/signup"
-                className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                className="rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/15 transition hover:-translate-y-0.5 hover:bg-primary-hover"
               >
-                Sign Up
+                Get Started
               </Link>
             </>
           )}
 
-          {/* Logged In */}
           {!isPending && user && (
             <div className="relative">
-
               {/* Profile Button */}
               <button
                 onClick={() => setProfileMenuOpen(!profileMenuOpen)}
                 aria-expanded={profileMenuOpen}
                 aria-haspopup="menu"
-                className="flex items-center gap-2 rounded-xl border border-gray-200 p-1.5 pr-3 transition hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+                className="flex items-center gap-2.5 rounded-2xl border border-border bg-surface p-1.5 pr-3 transition hover:border-primary/40 hover:bg-surface-secondary"
               >
                 {userImage ? (
                   <img
                     src={userImage}
                     alt={userName}
-                    className="h-9 w-9 rounded-lg object-cover"
+                    className="h-9 w-9 rounded-xl object-cover"
                   />
                 ) : (
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400">
-                    <UserRound size={20} />
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent text-primary">
+                    <UserRound size={19} />
                   </span>
                 )}
 
-                <span className="max-w-28 truncate text-sm font-semibold text-gray-800 dark:text-gray-200">
+                <span className="max-w-28 truncate text-sm font-semibold text-foreground">
                   {userName}
                 </span>
 
                 <ChevronDown
                   size={16}
-                  className={`text-gray-500 transition-transform ${
+                  className={`text-muted transition-transform ${
                     profileMenuOpen ? "rotate-180" : ""
                   }`}
                 />
@@ -193,24 +182,24 @@ const Navbar = () => {
               {profileMenuOpen && (
                 <div
                   role="menu"
-                  className="absolute right-0 top-full mt-3 w-64 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900"
+                  className="absolute right-0 top-full mt-3 w-64 overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl shadow-black/10"
                 >
-                  <div className="border-b border-gray-100 p-4 dark:border-gray-800">
-                    <p className="truncate font-bold text-gray-900 dark:text-white">
+                  <div className="border-b border-border bg-surface-secondary/60 p-4">
+                    <p className="truncate font-bold text-foreground">
                       {userName}
                     </p>
 
-                    <span className="mt-2 inline-flex rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold capitalize text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
+                    <span className="mt-2 inline-flex rounded-full bg-accent px-3 py-1 text-xs font-bold capitalize text-primary">
                       {role}
                     </span>
                   </div>
 
-                  <div className="p-2">
+                  <div className="space-y-1 p-2">
                     <Link
                       href={dashboardLink}
                       onClick={closeMenus}
                       role="menuitem"
-                      className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-blue-50 hover:text-blue-600 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-blue-400"
+                      className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-foreground transition hover:bg-accent hover:text-primary"
                     >
                       <LayoutDashboard size={18} />
                       Dashboard
@@ -220,7 +209,7 @@ const Navbar = () => {
                       href="/profile"
                       onClick={closeMenus}
                       role="menuitem"
-                      className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-blue-50 hover:text-blue-600 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-blue-400"
+                      className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-foreground transition hover:bg-accent hover:text-primary"
                     >
                       <Settings size={18} />
                       Update Profile
@@ -229,7 +218,7 @@ const Navbar = () => {
                     <button
                       onClick={handleSignOut}
                       role="menuitem"
-                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-red-500 transition hover:bg-red-50 dark:hover:bg-red-500/10"
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-danger transition hover:bg-danger/10"
                     >
                       <LogOut size={18} />
                       Sign Out
@@ -242,33 +231,26 @@ const Navbar = () => {
         </div>
 
         {/* Mobile Actions */}
-        <div className="flex shrink-0 items-center gap-2 md:hidden">
-
-          {/* Mobile Theme Toggle */}
+        <div className="flex items-center gap-2 md:hidden">
           <ThemeToggle />
 
-          {/* Hamburger Button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
             aria-expanded={mobileMenuOpen}
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 text-gray-700 transition hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+            className="flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-surface text-foreground transition hover:bg-surface-secondary"
           >
-            {mobileMenuOpen ? <X size={23} /> : <Menu size={23} />}
+            {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
         </div>
       </div>
 
       {/* Mobile Navigation */}
       {mobileMenuOpen && (
-        <div className="border-t border-gray-100 bg-white px-4 py-4 shadow-lg dark:border-gray-800 dark:bg-gray-950 md:hidden">
-
-          {/* Navigation Links */}
-          <nav
-            aria-label="Mobile navigation"
-            className="flex flex-col gap-1"
-          >
+        <div className="border-t border-border bg-background px-4 py-5 shadow-lg md:hidden sm:px-6">
+          <nav className="flex flex-col gap-1">
             {navLinks.map((link) => {
+              const Icon = link.icon;
               const active = isActive(link.href);
 
               return (
@@ -279,22 +261,20 @@ const Navbar = () => {
                   aria-current={active ? "page" : undefined}
                   className={getNavClass(active)}
                 >
+                  <Icon size={18} />
                   {link.label}
                 </Link>
               );
             })}
           </nav>
 
-          {/* Mobile Authentication */}
-          <div className="mt-4 border-t border-gray-100 pt-4 dark:border-gray-800">
-
-            {/* Logged Out */}
+          <div className="mt-4 border-t border-border pt-4">
             {!isPending && !user && (
               <div className="flex flex-col gap-2">
                 <Link
                   href="/signin"
                   onClick={closeMenus}
-                  className="rounded-xl border border-gray-200 px-4 py-3 text-center text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+                  className="rounded-xl border border-border px-4 py-3 text-center text-sm font-semibold text-foreground transition hover:bg-surface-secondary"
                 >
                   Sign In
                 </Link>
@@ -302,19 +282,17 @@ const Navbar = () => {
                 <Link
                   href="/signup"
                   onClick={closeMenus}
-                  className="rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-semibold text-white transition hover:bg-blue-700"
+                  className="rounded-xl bg-primary px-4 py-3 text-center text-sm font-bold text-primary-foreground transition hover:bg-primary-hover"
                 >
-                  Sign Up
+                  Get Started
                 </Link>
               </div>
             )}
 
-            {/* Logged In */}
             {!isPending && user && (
               <div className="space-y-2">
-
-                {/* User Information */}
-                <div className="flex items-center gap-3 rounded-xl bg-gray-50 p-3 dark:bg-gray-900">
+                {/* Mobile User Information */}
+                <div className="mb-3 flex items-center gap-3 rounded-2xl border border-border bg-surface-secondary p-3">
                   {userImage ? (
                     <img
                       src={userImage}
@@ -322,46 +300,42 @@ const Navbar = () => {
                       className="h-11 w-11 rounded-xl object-cover"
                     />
                   ) : (
-                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400">
-                      <UserRound size={22} />
+                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent text-primary">
+                      <UserRound size={21} />
                     </span>
                   )}
 
                   <div className="min-w-0">
-                    <p className="truncate font-bold text-gray-900 dark:text-white">
+                    <p className="truncate font-bold text-foreground">
                       {userName}
                     </p>
-
-                    <span className="text-xs font-semibold capitalize text-blue-600 dark:text-blue-400">
+                    <span className="text-xs font-semibold capitalize text-primary">
                       {role}
                     </span>
                   </div>
                 </div>
 
-                {/* Dashboard */}
                 <Link
                   href={dashboardLink}
                   onClick={closeMenus}
-                  className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-blue-400"
+                  className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-foreground transition hover:bg-accent hover:text-primary"
                 >
                   <LayoutDashboard size={19} />
                   Dashboard
                 </Link>
 
-                {/* Update Profile */}
                 <Link
                   href="/profile"
                   onClick={closeMenus}
-                  className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-blue-400"
+                  className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-foreground transition hover:bg-accent hover:text-primary"
                 >
                   <Settings size={19} />
                   Update Profile
                 </Link>
 
-                {/* Sign Out */}
                 <button
                   onClick={handleSignOut}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-danger transition hover:bg-danger/10"
                 >
                   <LogOut size={19} />
                   Sign Out
