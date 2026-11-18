@@ -8,7 +8,16 @@ const nextConfig: NextConfig = {
         hostname: "i.ibb.co",
         pathname: "/**",
       },
+       {
+        protocol: "https",
+        hostname: "**",
+      },
+      {
+        protocol: "http",
+        hostname: "**",
+      },
     ],
+    
   },
 
   experimental: {

@@ -21,23 +21,13 @@ import { toast } from "react-toastify";
 import { authClient } from "@/lib/auth-client";
 import UserInfoSkeleton from "./UserInfoSkeleton";
 
-
 const menuLinks = [
   {
     label: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
   },
-  {
-    label: "Add New Studio",
-    href: "/add-studios",
-    icon: PlusCircle,
-  },
-  {
-    label: "My Studio Listings",
-    href: "/my-listings",
-    icon: Building2,
-  },
+
   {
     label: "My Bookings",
     href: "/my-bookings",
@@ -46,7 +36,7 @@ const menuLinks = [
 ];
 
 const menuLinkClass =
-  "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-[#75677C] transition hover:bg-[#A78BBA]/15 hover:text-[#39243F] dark:text-[#C5B7CA] dark:hover:bg-[#A78BBA]/10 dark:hover:text-[#D6B98C]";
+  "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-200 transition-all duration-200 hover:bg-white/10 hover:text-[#b9e769]";
 
 const UserInfo = () => {
   const router = useRouter();
@@ -107,7 +97,7 @@ const UserInfo = () => {
       <div className="flex items-center gap-2">
         <Link
           href="/signin"
-          className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold text-[#39243F] transition hover:bg-[#A78BBA]/15 dark:text-[#D6B98C] dark:hover:bg-[#A78BBA]/10"
+          className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold text-gray-200 transition hover:bg-white/10 hover:text-[#b9e769]"
         >
           <LogIn size={17} />
           <span className="hidden sm:inline">Login</span>
@@ -115,7 +105,7 @@ const UserInfo = () => {
 
         <Link
           href="/signup"
-          className="flex items-center gap-1.5 rounded-xl bg-[#39243F] px-3 py-2 text-sm font-semibold text-white shadow-sm shadow-[#39243F]/20 transition hover:bg-[#503454] dark:bg-[#D6B98C] dark:text-[#211629] dark:hover:bg-[#E5CCA4]"
+          className="flex items-center gap-1.5 rounded-xl bg-[#b9e769] px-3 py-2 text-sm font-semibold text-[#102b25] shadow-sm shadow-black/10 transition hover:bg-[#c9f17e]"
         >
           <UserPlus size={17} />
           <span className="hidden sm:inline">Register</span>
@@ -148,9 +138,9 @@ const UserInfo = () => {
         onClick={() => setIsOpen((prev) => !prev)}
         aria-expanded={isOpen}
         aria-haspopup="true"
-        className="flex items-center gap-2 rounded-xl border border-[#E9E0E9] bg-white px-2 py-1.5 transition hover:border-[#A78BBA] hover:bg-[#F7F1E8] dark:border-[#49394D] dark:bg-[#39243F] dark:hover:border-[#A78BBA] dark:hover:bg-[#49394D]"
+        className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-2 py-1.5 transition hover:border-[#b9e769]/50 hover:bg-white/10"
       >
-        <span className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#E9E0E9] text-sm font-bold text-[#39243F] dark:bg-[#49394D] dark:text-[#D6B98C]">
+        <span className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#b9e769] text-sm font-bold text-[#102b25]">
           {userImage ? (
             <Image
               src={userImage}
@@ -164,13 +154,13 @@ const UserInfo = () => {
           )}
         </span>
 
-        <span className="hidden max-w-[100px] truncate text-sm font-semibold text-[#211629] dark:text-[#F7F1E8] sm:block">
+        <span className="hidden max-w-[100px] truncate text-sm font-semibold text-white sm:block">
           {userName}
         </span>
 
         <ChevronDown
           size={16}
-          className={`hidden text-[#75677C] transition-transform duration-200 dark:text-[#C5B7CA] sm:block ${
+          className={`hidden text-gray-300 transition-transform duration-200 sm:block ${
             isOpen ? "rotate-180" : ""
           }`}
         />
@@ -179,11 +169,12 @@ const UserInfo = () => {
       {/* Dropdown */}
       {isOpen && (
         <div className="absolute right-0 top-full z-50 w-64 pt-2">
-          <div className="overflow-hidden rounded-2xl border border-[#E9E0E9] bg-white shadow-xl shadow-[#211629]/10 dark:border-[#49394D] dark:bg-[#39243F] dark:shadow-black/30 ">
+          <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#183a31] shadow-xl shadow-black/30">
+
             {/* User Information */}
-            <div className="border-b border-[#E9E0E9] bg-gradient-to-br from-[#F7F1E8] to-white px-4 py-4 dark:border-[#49394D] dark:from-[#49394D] dark:to-[#39243F]">
+            <div className="border-b border-white/10 bg-white/5 px-4 py-4">
               <div className="flex items-center gap-3">
-                <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#E9E0E9] text-sm font-bold text-[#39243F] dark:bg-[#211629] dark:text-[#D6B98C]">
+                <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#b9e769] text-sm font-bold text-[#102b25]">
                   {userImage ? (
                     <Image
                       src={userImage}
@@ -198,11 +189,11 @@ const UserInfo = () => {
                 </div>
 
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-bold text-[#211629] dark:text-[#F7F1E8]">
+                  <p className="truncate text-sm font-bold text-white">
                     {userName}
                   </p>
 
-                  <p className="truncate text-xs text-[#75677C] dark:text-[#C5B7CA]">
+                  <p className="truncate text-xs text-gray-400">
                     {userEmail}
                   </p>
                 </div>
@@ -227,7 +218,7 @@ const UserInfo = () => {
                 );
               })}
 
-              <div className="my-2 border-t border-[#E9E0E9] dark:border-[#49394D]" />
+              <div className="my-2 border-t border-white/10" />
 
               <Link
                 href="/profile"
@@ -241,7 +232,7 @@ const UserInfo = () => {
               <button
                 type="button"
                 onClick={handleSignOut}
-                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-red-500 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-red-300 transition hover:bg-red-400/10"
               >
                 <LogOut size={17} />
                 Sign Out
