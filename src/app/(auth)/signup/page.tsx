@@ -163,6 +163,9 @@ const SignUpPage = () => {
 
     const name = String(formData.get("name") ?? "").trim();
     const email = String(formData.get("email") ?? "").trim();
+    const phone = String(formData.get("phone") ?? "").trim();
+const area = String(formData.get("area") ?? "").trim();
+const bio = String(formData.get("bio") ?? "").trim();
 
     const confirmPassword = String(
       formData.get("confirmPassword") ?? ""
@@ -243,14 +246,17 @@ const SignUpPage = () => {
       }
 
       // STEP 2: Register user with Better Auth
-      const { data, error } = await authClient.signUp.email({
-        name,
-        email,
-        password,
-        image: imageUrl,
-        role: selectedRole,
-        callbackURL: dashboardPath,
-      });
+     const { data, error } = await authClient.signUp.email({
+  name,
+  email,
+  password,
+  image: imageUrl,
+  role: selectedRole,
+  phone,
+  area,
+  bio,
+  callbackURL: dashboardPath,
+});
 
       if (error) {
         const message =
@@ -369,6 +375,68 @@ const SignUpPage = () => {
                     className={inputClass}
                   />
                 </div>
+
+{/* Phone Number */}
+<div>
+  <label htmlFor="phone" className={labelClass}>
+    Phone Number
+    <span className="ml-1 font-normal text-muted">
+      (Optional)
+    </span>
+  </label>
+
+  <input
+    id="phone"
+    name="phone"
+    type="tel"
+    autoComplete="tel"
+    placeholder="Enter your phone number"
+    className={inputClass}
+  />
+</div>
+
+{/* Area / City */}
+<div>
+  <label htmlFor="area" className={labelClass}>
+    Area / City
+    <span className="ml-1 font-normal text-muted">
+      (Optional)
+    </span>
+  </label>
+
+  <input
+    id="area"
+    name="area"
+    type="text"
+    autoComplete="address-level2"
+    placeholder="e.g. Mirpur, Dhaka"
+    className={inputClass}
+  />
+</div>
+
+{/* Bio */}
+<div>
+  <label htmlFor="bio" className={labelClass}>
+    Bio
+    <span className="ml-1 font-normal text-muted">
+      (Optional)
+    </span>
+  </label>
+
+  <textarea
+    id="bio"
+    name="bio"
+    rows={3}
+    maxLength={300}
+    placeholder="Tell us about yourself, your skills and experience..."
+    className="w-full rounded-xl border border-input bg-surface px-4 py-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none"
+  />
+
+  <p className="mt-1 text-xs text-muted">
+    Maximum 300 characters.
+  </p>
+</div>
+
 
                 {/* Profile picture upload */}
                 <div>
