@@ -3,9 +3,10 @@
 
 import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { toast } from "react-toastify";
+
 import {
   Eye,
   EyeOff,
@@ -14,13 +15,17 @@ import {
   Wrench,
   UserRound,
   ShieldCheck,
+  ImagePlus,
+  X,
 } from "lucide-react";
-import { SignupSkeleton } from "../components/SignupSkeleton";
+
+import { SignupSkeleton } from "../../components/SignupSkeleton";
 
 type UserRole = "customer" | "technician";
 
 const SignUpPage = () => {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -28,6 +33,10 @@ const SignUpPage = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<UserRole>("customer");
+
+  // Profile image states
+  const [image, setImage] = useState<File | null>(null);
+const [preview, setPreview] = useState<string | null>(null);
 
   // Password validation
   const hasUppercase = /[A-Z]/.test(password);
@@ -37,6 +46,73 @@ const SignUpPage = () => {
   const passwordIsValid =
     hasUppercase && hasLowercase && hasMinLength;
 
+  // Handle image selection
+ const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+
+  if (!file) return;
+
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+
+  if (!allowedTypes.includes(file.type)) {
+    toast.error("Only JPG, PNG and WEBP images are allowed.");
+    e.target.value = "";
+    return;
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    toast.error("Image must be smaller than 5MB.");
+    e.target.value = "";
+    return;
+  }
+
+  setImage(file);
+  setPreview(URL.createObjectURL(file));
+};
+
+const removeImage = () => {
+  setImage(null);
+  setPreview(null);
+
+  if (fileInputRef.current) {
+    fileInputRef.current.value = "";
+  }
+};
+
+  
+
+ // Clean up preview URL when it changes or component unmounts
+useEffect(() => {
+  if (!preview) return;
+
+  return () => {
+    URL.revokeObjectURL(preview);
+  };
+}, [preview]);
+
+  // Password requirement styles
+  const passwordRuleClass = (isValid: boolean) =>
+    `flex items-center gap-2 text-xs transition-colors ${
+      isValid ? "text-success" : "text-muted"
+    }`;
+
+  const inputClass =
+    "h-12 w-full rounded-xl border border-input bg-surface px-4 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20";
+
+  const visibilityButtonClass =
+    "absolute right-3 top-1/2 -translate-y-1/2 text-muted transition hover:text-primary";
+
+  const labelClass =
+    "mb-2 block text-sm font-medium text-foreground";
+
+  const roleCardClass = (selected: boolean) =>
+    `flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${
+      selected
+        ? "border-primary bg-accent ring-2 ring-primary/15"
+        : "border-border bg-surface hover:border-primary/50"
+    }`;
+
+  // Signup handler
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -45,6 +121,7 @@ const SignUpPage = () => {
 
     const name = String(formData.get("name") ?? "").trim();
     const email = String(formData.get("email") ?? "").trim();
+
     const confirmPassword = String(
       formData.get("confirmPassword") ?? ""
     );
@@ -85,7 +162,7 @@ const SignUpPage = () => {
       return;
     }
 
-    // Only allow customer or technician
+    // Determine selected role
     const selectedRole: UserRole =
       role === "technician" ? "technician" : "customer";
 
@@ -97,12 +174,39 @@ const SignUpPage = () => {
     setLoading(true);
 
     try {
+      let imageUrl: string | undefined;
+
+      // STEP 1: Upload image to ImgBB
+      if (image) {
+        const uploadFormData = new FormData();
+
+        uploadFormData.append("image", image);
+
+        const uploadResponse = await fetch("/api/upload", {
+          method: "POST",
+          body: uploadFormData,
+        });
+
+        const uploadResult = await uploadResponse.json();
+
+        if (!uploadResponse.ok || !uploadResult.imageUrl) {
+          throw new Error(
+            uploadResult.error || "Image upload failed."
+          );
+        }
+
+        imageUrl = uploadResult.imageUrl;
+
+        console.log("Image uploaded successfully:", imageUrl);
+      }
+
+      // STEP 2: Register user with Better Auth
       const { data, error } = await authClient.signUp.email({
         name,
         email,
         password,
-        image: "",
-        // role: selectedRole,
+        image: imageUrl,
+        role: selectedRole,
         callbackURL: dashboardPath,
       });
 
@@ -116,18 +220,34 @@ const SignUpPage = () => {
       }
 
       if (data) {
+        // Reset form
         form.reset();
         setPassword("");
         setRole("customer");
+        setImage(null);
+
+        setPreview((oldPreview) => {
+          if (oldPreview) {
+            URL.revokeObjectURL(oldPreview);
+          }
+
+          return "";
+        });
+
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
 
         toast.success("Your FixMate account has been created!");
 
         router.push(dashboardPath);
         router.refresh();
       }
-    } catch {
+    } catch (error) {
       const message =
-        "Something went wrong while creating your account.";
+        error instanceof Error
+          ? error.message
+          : "Something went wrong while creating your account.";
 
       setErrorMessage(message);
       toast.error(message);
@@ -135,29 +255,6 @@ const SignUpPage = () => {
       setLoading(false);
     }
   };
-
-  const passwordRuleClass = (isValid: boolean) =>
-    `flex items-center gap-2 text-xs transition-colors ${
-      isValid
-        ? "text-success"
-        : "text-muted"
-    }`;
-
-  const inputClass =
-    "h-12 w-full rounded-xl border border-input bg-surface px-4 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20";
-
-  const visibilityButtonClass =
-    "absolute right-3 top-1/2 -translate-y-1/2 text-muted transition hover:text-primary";
-
-  const labelClass =
-    "mb-2 block text-sm font-medium text-foreground";
-
-  const roleCardClass = (selected: boolean) =>
-    `flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${
-      selected
-        ? "border-primary bg-accent ring-2 ring-primary/15"
-        : "border-border bg-surface hover:border-primary/50"
-    }`;
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-10 text-foreground transition-colors duration-300">
@@ -232,6 +329,72 @@ const SignUpPage = () => {
                   placeholder="you@example.com"
                   className={inputClass}
                 />
+              </div>
+
+              {/* Profile picture upload */}
+              <div>
+                <label className={labelClass}>
+                  Profile picture
+                  <span className="ml-1 font-normal text-muted">
+                    (Optional)
+                  </span>
+                </label>
+
+                <div className="flex items-center gap-4">
+
+                  {/* Image preview */}
+                  <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-border bg-surface-secondary">
+
+                    {preview ? (
+                      <img
+                        src={preview}
+                        alt="Profile preview"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <UserRound
+                        size={32}
+                        className="text-muted"
+                      />
+                    )}
+
+                    {preview && (
+                      <button
+                        type="button"
+                        onClick={removeImage}
+                        aria-label="Remove profile picture"
+                        className="absolute right-0 top-0 flex h-6 w-6 items-center justify-center rounded-full bg-danger text-white shadow"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Upload button */}
+                  <div className="min-w-0 flex-1">
+                    <label
+                      htmlFor="profileImage"
+                      className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-border bg-surface px-4 py-3 text-sm font-medium text-foreground transition hover:border-primary hover:bg-accent"
+                    >
+                      <ImagePlus size={18} className="text-primary" />
+                      {preview ? "Change photo" : "Upload photo"}
+                    </label>
+
+                    <input
+                      ref={fileInputRef}
+                      id="profileImage"
+                      name="profileImage"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={handleImageChange}
+                      className="hidden"
+                    />
+
+                    <p className="mt-2 text-xs text-muted">
+                      JPG, PNG or WEBP. Maximum 5MB.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               {/* Role selection */}
