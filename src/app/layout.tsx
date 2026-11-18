@@ -3,8 +3,9 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import ThemeProvider from "./components/theme/ThemeProvider";
 import { Suspense } from "react";
-import Navbar from "./components/navbar/Navbar";
+import Navbar from "./components/shared/navbar/Navbar";
 import { ToastContainer } from "react-toastify";
+import Footer from "./components/shared/footer/Footer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -38,6 +39,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <main className="mx-auto w-full">
             {children}
           </main>
+          <Footer/>
 
           <ToastContainer />
 

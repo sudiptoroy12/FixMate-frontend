@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 
 import { authClient } from "@/lib/auth-client";
-import ThemeToggle from "../theme/ThemeToggle";
+import ThemeToggle from "../../theme/ThemeToggle";
 
 const navLinks = [
   { label: "Home", href: "/", icon: Home },
