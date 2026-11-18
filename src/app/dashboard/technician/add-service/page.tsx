@@ -2,6 +2,7 @@
 "use client";
 
 import {  useState } from "react";
+
 import {
   Wrench,
   ImagePlus,
@@ -10,6 +11,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { toast } from "react-toastify";
+import { getTokenFromClient } from "@/lib/(getToken)/getTokenFromClient";
 
 const categories = [
   "Smartphone",
@@ -65,56 +67,129 @@ const removeImage = () => {
   setPreview(null);
 };
 
-  const handleSubmit = async (
-    event: React.FormEvent<HTMLFormElement>
-  ) => {
-    event.preventDefault();
 
-    if (!image) {
-      toast.error("Please upload a service image.");
-      return;
+const handleSubmit = async (
+  event: React.FormEvent<HTMLFormElement>
+) => {
+  event.preventDefault();
+
+  if (!image) {
+    toast.error("Please upload a service image.");
+    return;
+  }
+
+  const form = event.currentTarget;
+  const formData = new FormData(form);
+
+  const serviceData = {
+    title: String(formData.get("title") ?? "").trim(),
+    category: String(formData.get("category") ?? ""),
+    description: String(formData.get("description") ?? "").trim(),
+    basePrice: Number(formData.get("basePrice")),
+    estimatedDuration: String(
+      formData.get("estimatedDuration") ?? ""
+    ).trim(),
+    serviceMode: String(formData.get("serviceMode") ?? ""),
+    serviceArea: String(formData.get("serviceArea") ?? "").trim(),
+  };
+
+  if (
+    !serviceData.title ||
+    !serviceData.category ||
+    !serviceData.description ||
+    !serviceData.serviceMode ||
+    !serviceData.serviceArea ||
+    !serviceData.estimatedDuration ||
+    !Number.isFinite(serviceData.basePrice) ||
+    serviceData.basePrice <= 0
+  ) {
+    toast.error("Please provide valid service information.");
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    // Step 1: Get authenticated JWT token
+   const token = await getTokenFromClient();
+
+if (!token) {
+  throw new Error("Authentication failed. Please sign in again.");
+}
+
+    // Step 2: Upload image to ImgBB through your Next.js API
+    const imageFormData = new FormData();
+    imageFormData.append("image", image);
+
+    const uploadResponse = await fetch("/api/upload", {
+      method: "POST",
+      body: imageFormData,
+    });
+
+    const uploadResult = await uploadResponse.json();
+
+    if (!uploadResponse.ok || !uploadResult.success || !uploadResult.imageUrl) {
+      throw new Error(
+        uploadResult.message || "Image upload failed."
+      );
     }
 
-    const formData = new FormData(event.currentTarget);
+    const imageUrl = uploadResult.imageUrl;
 
-    const serviceData = {
-      title: String(formData.get("title") ?? "").trim(),
-      category: String(formData.get("category") ?? ""),
-      description: String(formData.get("description") ?? "").trim(),
-      basePrice: Number(formData.get("basePrice")),
-      estimatedDuration: String(
-        formData.get("estimatedDuration") ?? ""
-      ).trim(),
-      serviceMode: String(formData.get("serviceMode") ?? ""),
-      serviceArea: String(formData.get("serviceArea") ?? "").trim(),
+    // Step 3: Prepare complete service data
+    const completeServiceData = {
+      ...serviceData,
+      image: imageUrl,
     };
 
-    if (
-      !serviceData.title ||
-      !serviceData.description ||
-      !serviceData.serviceArea ||
-      !serviceData.estimatedDuration ||
-      !Number.isFinite(serviceData.basePrice) ||
-      serviceData.basePrice <= 0
-    ) {
-      toast.error("Please provide valid service information.");
-      return;
+    // Step 4: Send service data to Express backend
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+
+    if (!apiUrl) {
+      throw new Error("Backend API URL is not configured.");
     }
 
-    setLoading(true);
+    const response = await fetch(
+      `${apiUrl.replace(/\/$/, "")}/api/services`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(completeServiceData),
+      }
+    );
 
-    try {
-      // Backend and ImgBB integration will be added next.
-      console.log("Service data:", serviceData);
-      console.log("Selected image:", image);
+    const result = await response.json();
 
-      toast.success("Service form is ready!");
-    } catch {
-      toast.error("Something went wrong!");
-    } finally {
-      setLoading(false);
+    if (!response.ok) {
+      throw new Error(
+        result.message || "Failed to create service."
+      );
     }
-  };
+
+    // Step 5: Success
+    toast.success("Service created successfully!");
+
+    form.reset();
+
+    URL.revokeObjectURL(preview!);
+    setImage(null);
+    setPreview(null);
+
+  } catch (error) {
+    console.error("Service creation error:", error);
+
+    toast.error(
+      error instanceof Error
+        ? error.message
+        : "Something went wrong!"
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
