@@ -1,23 +1,31 @@
 
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import { toast } from "react-toastify";
+
 import {
   Search,
   ClipboardList,
   Clock,
   CheckCircle,
-  XCircle,
   Eye,
   RefreshCw,
   MapPin,
   CalendarDays,
-  Wrench,
-  Play,
   Loader2,
+  X,
+  Phone,
+  Mail,
+  CreditCard,
 } from "lucide-react";
+
 import { getTokenFromClient } from "@/lib/(getToken)/getTokenFromClient";
 
 interface ServiceRequest {
@@ -32,15 +40,21 @@ interface ServiceRequest {
   customerEmail: string;
   customerPhone: string;
 
-  deviceName: string;
   problemDescription: string;
-
   address: string;
   preferredDate: string;
-  preferredTime: string;
 
-  status: "pending" | "accepted" | "rejected" | "in-progress" | "completed";
+  status:
+    | "requested"
+    | "accepted"
+    | "rejected"
+    | "in-progress"
+    | "completed";
+
+  paymentStatus: "unpaid" | "paid";
+
   createdAt: string;
+  updatedAt: string;
 }
 
 type FilterStatus = "all" | ServiceRequest["status"];
@@ -48,11 +62,16 @@ type FilterStatus = "all" | ServiceRequest["status"];
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 const statusStyles: Record<ServiceRequest["status"], string> = {
-  pending: "bg-amber-100 text-amber-700",
+  requested: "bg-amber-100 text-amber-700",
   accepted: "bg-blue-100 text-blue-700",
   rejected: "bg-red-100 text-red-700",
   "in-progress": "bg-purple-100 text-purple-700",
   completed: "bg-green-100 text-green-700",
+};
+
+const paymentStyles: Record<ServiceRequest["paymentStatus"], string> = {
+  unpaid: "bg-amber-100 text-amber-700",
+  paid: "bg-green-100 text-green-700",
 };
 
 export default function TechnicianRequestsPage() {
@@ -65,96 +84,54 @@ export default function TechnicianRequestsPage() {
     useState<ServiceRequest | null>(null);
 
   // Fetch technician requests
-  const fetchRequests = async () => {
-    try {
-      const token = await getTokenFromClient();
-
-      if ( !token) {
-        toast.error("Please sign in again.");
-        return;
-      }
-
-      const response = await fetch(
-        `${API_URL}/api/service-requests/technician`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          cache: "no-store",
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(
-          result.message || "Failed to fetch service requests."
-        );
-      }
-
-      setRequests(result.data || []);
-    } catch (error) {
-      console.error("Fetch requests error:", error);
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Something went wrong!"
-      );
-    } finally {
-      setLoading(false);
+ const fetchRequests = useCallback(async () => {
+  try {
+    if (!API_URL) {
+      throw new Error("API URL is not configured.");
     }
-  };
+
+    const token = await getTokenFromClient();
+
+    const response = await fetch(
+      `${API_URL}/api/service-requests/technician`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        cache: "no-store",
+      }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      throw new Error(
+        result.message || "Failed to fetch service requests."
+      );
+    }
+
+    setRequests(result.data || []);
+  } catch (error) {
+    console.error("Fetch requests error:", error);
+
+    toast.error(
+      error instanceof Error
+        ? error.message
+        : "Something went wrong!"
+    );
+  } finally {
+    setLoading(false);
+  }
+}, []);
 
 useEffect(() => {
-  let ignore = false;
+  const timer = setTimeout(() => {
+    fetchRequests();
+  }, 0);
 
-  const loadRequests = async () => {
-    try {
-      const token = await getTokenFromClient();
-
-      const response = await fetch(
-        `${API_URL}/api/service-requests/technician`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          cache: "no-store",
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(
-          result.message || "Failed to fetch service requests."
-        );
-      }
-
-      if (!ignore) {
-        setRequests(result.data || []);
-      }
-    } catch (error) {
-      if (!ignore) {
-        console.error("Fetch requests error:", error);
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : "Something went wrong!"
-        );
-      }
-    } finally {
-      if (!ignore) {
-        setLoading(false);
-      }
-    }
-  };
-
-  loadRequests();
-
-  return () => {
-    ignore = true;
-  };
-}, []);
+  return () => clearTimeout(timer);
+}, [fetchRequests]);
 
   // Update request status
   const handleStatusUpdate = async (
@@ -162,9 +139,13 @@ useEffect(() => {
     status: ServiceRequest["status"]
   ) => {
     try {
+      if (!API_URL) {
+        throw new Error("API URL is not configured.");
+      }
+
       setUpdatingId(id);
 
-    const token = await getTokenFromClient();
+      const token = await getTokenFromClient();
 
       const response = await fetch(
         `${API_URL}/api/service-requests/${id}/status`,
@@ -186,7 +167,9 @@ useEffect(() => {
         );
       }
 
-      toast.success(result.message || "Request updated successfully!");
+      toast.success(
+        result.message || "Request updated successfully!"
+      );
 
       setRequests((previous) =>
         previous.map((request) =>
@@ -196,13 +179,14 @@ useEffect(() => {
         )
       );
 
-      if (selectedRequest?._id === id) {
-        setSelectedRequest((previous) =>
-          previous ? { ...previous, status } : null
-        );
-      }
+      setSelectedRequest((previous) =>
+        previous?._id === id
+          ? { ...previous, status }
+          : previous
+      );
     } catch (error) {
       console.error("Update request error:", error);
+
       toast.error(
         error instanceof Error
           ? error.message
@@ -216,16 +200,12 @@ useEffect(() => {
   // Search and filter
   const filteredRequests = useMemo(() => {
     return requests.filter((request) => {
+      const searchTerm = search.toLowerCase();
+
       const matchesSearch =
-        request.customerName
-          .toLowerCase()
-          .includes(search.toLowerCase()) ||
-        request.serviceTitle
-          .toLowerCase()
-          .includes(search.toLowerCase()) ||
-        request.deviceName
-          .toLowerCase()
-          .includes(search.toLowerCase());
+        request.customerName.toLowerCase().includes(searchTerm) ||
+        request.customerEmail.toLowerCase().includes(searchTerm) ||
+        request.serviceTitle.toLowerCase().includes(searchTerm);
 
       const matchesFilter =
         filter === "all" || request.status === filter;
@@ -243,8 +223,8 @@ useEffect(() => {
       color: "bg-blue-50 text-blue-600",
     },
     {
-      title: "Pending",
-      value: requests.filter((r) => r.status === "pending").length,
+      title: "Requested",
+      value: requests.filter((r) => r.status === "requested").length,
       icon: Clock,
       color: "bg-amber-50 text-amber-600",
     },
@@ -267,6 +247,81 @@ useEffect(() => {
       char.toUpperCase()
     );
 
+  const formatDate = (date: string) => {
+    if (!date) return "Not specified";
+
+    const parsedDate = new Date(`${date}T00:00:00`);
+
+    if (Number.isNaN(parsedDate.getTime())) {
+      return date;
+    }
+
+    return parsedDate.toLocaleDateString("en-BD", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const renderActions = (request: ServiceRequest, modal = false) => {
+    const isUpdating = updatingId === request._id;
+
+    const buttonClass =
+      "rounded-lg px-3 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50";
+
+    return (
+      <>
+        {request.status === "requested" && (
+          <>
+            <button
+              disabled={isUpdating}
+              onClick={() =>
+                handleStatusUpdate(request._id, "accepted")
+              }
+              className={`${buttonClass} bg-[#102b25] text-[#b9e769]`}
+            >
+              {isUpdating ? "Updating..." : modal ? "Accept Request" : "Accept"}
+            </button>
+
+            <button
+              disabled={isUpdating}
+              onClick={() =>
+                handleStatusUpdate(request._id, "rejected")
+              }
+              className={`${buttonClass} bg-red-50 text-red-600 hover:bg-red-100`}
+            >
+              Reject
+            </button>
+          </>
+        )}
+
+        {request.status === "accepted" && (
+          <button
+            disabled={isUpdating}
+            onClick={() =>
+              handleStatusUpdate(request._id, "in-progress")
+            }
+            className={`${buttonClass} bg-purple-600 text-white`}
+          >
+            {isUpdating ? "Updating..." : "Start Job"}
+          </button>
+        )}
+
+        {request.status === "in-progress" && (
+          <button
+            disabled={isUpdating}
+            onClick={() =>
+              handleStatusUpdate(request._id, "completed")
+            }
+            className={`${buttonClass} bg-green-600 text-white`}
+          >
+            {isUpdating ? "Updating..." : modal ? "Mark as Completed" : "Complete"}
+          </button>
+        )}
+      </>
+    );
+  };
+
   return (
     <div className="mx-auto max-w-7xl space-y-7">
 
@@ -276,25 +331,30 @@ useEffect(() => {
           <p className="mb-1 text-sm font-medium text-[#5c9635]">
             Technician Panel
           </p>
+
           <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
             Service Requests
           </h1>
+
           <p className="mt-2 text-sm text-muted">
             Manage customer repair requests and job status.
           </p>
         </div>
 
         <button
-          onClick={fetchRequests}
-          disabled={loading}
-          className="flex items-center justify-center gap-2 rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-accent disabled:opacity-50"
-        >
-          <RefreshCw
-            size={17}
-            className={loading ? "animate-spin" : ""}
-          />
-          Refresh
-        </button>
+  onClick={() => {
+    setLoading(true);
+    fetchRequests();
+  }}
+  disabled={loading}
+  className="flex items-center justify-center gap-2 rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-accent disabled:opacity-50"
+>
+  <RefreshCw
+    size={17}
+    className={loading ? "animate-spin" : ""}
+  />
+  Refresh
+</button>
       </div>
 
       {/* Statistics */}
@@ -310,6 +370,7 @@ useEffect(() => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted">{stat.title}</p>
+
                   <h2 className="mt-2 text-3xl font-bold text-foreground">
                     {stat.value}
                   </h2>
@@ -334,6 +395,7 @@ useEffect(() => {
               <h2 className="text-lg font-bold text-foreground">
                 Customer Requests
               </h2>
+
               <p className="mt-1 text-sm text-muted">
                 Review and manage your incoming service requests.
               </p>
@@ -344,9 +406,10 @@ useEffect(() => {
                 size={18}
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
               />
+
               <input
                 type="text"
-                placeholder="Search customer, service or device..."
+                placeholder="Search customer or service..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full rounded-xl border border-border bg-background py-3 pl-10 pr-4 text-sm text-foreground outline-none transition focus:border-[#82b944] focus:ring-2 focus:ring-[#82b944]/20"
@@ -354,11 +417,12 @@ useEffect(() => {
             </div>
           </div>
 
+          {/* Status Filters */}
           <div className="flex flex-wrap gap-2">
             {(
               [
                 "all",
-                "pending",
+                "requested",
                 "accepted",
                 "in-progress",
                 "completed",
@@ -374,7 +438,9 @@ useEffect(() => {
                     : "bg-background text-muted hover:bg-accent"
                 }`}
               >
-                {status === "all" ? "All Requests" : formatStatus(status)}
+                {status === "all"
+                  ? "All Requests"
+                  : formatStatus(status)}
               </button>
             ))}
           </div>
@@ -383,16 +449,21 @@ useEffect(() => {
         {/* Request List */}
         {loading ? (
           <div className="flex min-h-64 items-center justify-center">
-            <Loader2 className="animate-spin text-[#5c9635]" size={32} />
+            <Loader2
+              className="animate-spin text-[#5c9635]"
+              size={32}
+            />
           </div>
         ) : filteredRequests.length === 0 ? (
           <div className="flex min-h-72 flex-col items-center justify-center px-5 text-center">
             <div className="rounded-2xl bg-[#b9e769]/20 p-5">
               <ClipboardList size={35} className="text-[#5c9635]" />
             </div>
+
             <h3 className="mt-4 text-lg font-bold text-foreground">
               No service requests found
             </h3>
+
             <p className="mt-2 max-w-sm text-sm text-muted">
               {search || filter !== "all"
                 ? "Try changing your search or filter."
@@ -408,20 +479,24 @@ useEffect(() => {
                   <tr>
                     <th className="px-5 py-4">Customer</th>
                     <th className="px-5 py-4">Service</th>
-                    <th className="px-5 py-4">Device</th>
                     <th className="px-5 py-4">Date</th>
                     <th className="px-5 py-4">Status</th>
+                    <th className="px-5 py-4">Payment</th>
                     <th className="px-5 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
 
                 <tbody className="divide-y divide-border">
                   {filteredRequests.map((request) => (
-                    <tr key={request._id} className="transition hover:bg-accent/40">
+                    <tr
+                      key={request._id}
+                      className="transition hover:bg-accent/40"
+                    >
                       <td className="px-5 py-5">
                         <p className="font-semibold text-foreground">
                           {request.customerName}
                         </p>
+
                         <p className="mt-1 text-xs text-muted">
                           {request.customerEmail}
                         </p>
@@ -431,22 +506,29 @@ useEffect(() => {
                         <p className="font-medium text-foreground">
                           {request.serviceTitle}
                         </p>
+
                         <p className="mt-1 text-xs text-muted">
                           {request.serviceCategory}
                         </p>
                       </td>
 
                       <td className="px-5 py-5 text-sm text-foreground">
-                        {request.deviceName}
-                      </td>
-
-                      <td className="px-5 py-5 text-sm text-foreground">
-                        {request.preferredDate}
+                        {formatDate(request.preferredDate)}
                       </td>
 
                       <td className="px-5 py-5">
-                        <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ${statusStyles[request.status]}`}>
+                        <span
+                          className={`rounded-full px-3 py-1.5 text-xs font-semibold ${statusStyles[request.status]}`}
+                        >
                           {formatStatus(request.status)}
+                        </span>
+                      </td>
+
+                      <td className="px-5 py-5">
+                        <span
+                          className={`rounded-full px-3 py-1.5 text-xs font-semibold ${paymentStyles[request.paymentStatus]}`}
+                        >
+                          {formatStatus(request.paymentStatus)}
                         </span>
                       </td>
 
@@ -460,53 +542,7 @@ useEffect(() => {
                             <Eye size={17} />
                           </button>
 
-                          {request.status === "pending" && (
-                            <>
-                              <button
-                                disabled={updatingId === request._id}
-                                onClick={() =>
-                                  handleStatusUpdate(request._id, "accepted")
-                                }
-                                className="rounded-lg bg-[#102b25] px-3 py-2 text-xs font-semibold text-[#b9e769] disabled:opacity-50"
-                              >
-                                Accept
-                              </button>
-
-                              <button
-                                disabled={updatingId === request._id}
-                                onClick={() =>
-                                  handleStatusUpdate(request._id, "rejected")
-                                }
-                                className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 disabled:opacity-50"
-                              >
-                                Reject
-                              </button>
-                            </>
-                          )}
-
-                          {request.status === "accepted" && (
-                            <button
-                              disabled={updatingId === request._id}
-                              onClick={() =>
-                                handleStatusUpdate(request._id, "in-progress")
-                              }
-                              className="rounded-lg bg-purple-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
-                            >
-                              Start Job
-                            </button>
-                          )}
-
-                          {request.status === "in-progress" && (
-                            <button
-                              disabled={updatingId === request._id}
-                              onClick={() =>
-                                handleStatusUpdate(request._id, "completed")
-                              }
-                              className="rounded-lg bg-green-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
-                            >
-                              Complete
-                            </button>
-                          )}
+                          {renderActions(request)}
                         </div>
                       </td>
                     </tr>
@@ -527,24 +563,25 @@ useEffect(() => {
                       <h3 className="font-bold text-foreground">
                         {request.serviceTitle}
                       </h3>
+
                       <p className="mt-1 text-xs text-muted">
                         {request.customerName}
                       </p>
                     </div>
-                    <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[request.status]}`}>
+
+                    <span
+                      className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[request.status]}`}
+                    >
                       {formatStatus(request.status)}
                     </span>
                   </div>
 
                   <div className="mt-4 space-y-2 text-sm text-muted">
                     <p className="flex items-center gap-2">
-                      <Wrench size={15} />
-                      {request.deviceName}
-                    </p>
-                    <p className="flex items-center gap-2">
                       <CalendarDays size={15} />
-                      {request.preferredDate} · {request.preferredTime}
+                      {formatDate(request.preferredDate)}
                     </p>
+
                     <p className="flex items-center gap-2">
                       <MapPin size={15} />
                       {request.address}
@@ -560,52 +597,7 @@ useEffect(() => {
                       View Details
                     </button>
 
-                    {request.status === "pending" && (
-                      <>
-                        <button
-                          disabled={updatingId === request._id}
-                          onClick={() =>
-                            handleStatusUpdate(request._id, "accepted")
-                          }
-                          className="rounded-lg bg-[#102b25] px-3 py-2 text-xs font-semibold text-[#b9e769] disabled:opacity-50"
-                        >
-                          Accept
-                        </button>
-                        <button
-                          disabled={updatingId === request._id}
-                          onClick={() =>
-                            handleStatusUpdate(request._id, "rejected")
-                          }
-                          className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 disabled:opacity-50"
-                        >
-                          Reject
-                        </button>
-                      </>
-                    )}
-
-                    {request.status === "accepted" && (
-                      <button
-                        disabled={updatingId === request._id}
-                        onClick={() =>
-                          handleStatusUpdate(request._id, "in-progress")
-                        }
-                        className="rounded-lg bg-purple-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
-                      >
-                        Start Job
-                      </button>
-                    )}
-
-                    {request.status === "in-progress" && (
-                      <button
-                        disabled={updatingId === request._id}
-                        onClick={() =>
-                          handleStatusUpdate(request._id, "completed")
-                        }
-                        className="rounded-lg bg-green-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
-                      >
-                        Complete
-                      </button>
-                    )}
+                    {renderActions(request)}
                   </div>
                 </div>
               ))}
@@ -624,37 +616,53 @@ useEffect(() => {
             className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-surface p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Modal Header */}
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-foreground">
-                Request Details
-              </h2>
+              <div>
+                <h2 className="text-xl font-bold text-foreground">
+                  Request Details
+                </h2>
+
+                <p className="mt-1 text-sm text-muted">
+                  Review customer and repair information.
+                </p>
+              </div>
+
               <button
                 onClick={() => setSelectedRequest(null)}
-                className="rounded-lg px-3 py-1 text-muted hover:bg-accent"
+                className="rounded-lg p-2 text-muted hover:bg-accent"
+                aria-label="Close modal"
               >
-                ✕
+                <X size={20} />
               </button>
             </div>
 
             <div className="mt-6 space-y-5">
+
+              {/* Service Information */}
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h3 className="font-bold text-foreground">
                     {selectedRequest.serviceTitle}
                   </h3>
+
                   <p className="text-sm text-muted">
                     {selectedRequest.serviceCategory}
                   </p>
                 </div>
 
-                <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ${statusStyles[selectedRequest.status]}`}>
+                <span
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold ${statusStyles[selectedRequest.status]}`}
+                >
                   {formatStatus(selectedRequest.status)}
                 </span>
               </div>
 
+              {/* Information Cards */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="rounded-xl bg-background p-4">
                   <p className="text-xs text-muted">Customer Name</p>
+
                   <p className="mt-1 font-semibold text-foreground">
                     {selectedRequest.customerName}
                   </p>
@@ -662,20 +670,16 @@ useEffect(() => {
 
                 <div className="rounded-xl bg-background p-4">
                   <p className="text-xs text-muted">Phone Number</p>
-                  <p className="mt-1 font-semibold text-foreground">
+
+                  <p className="mt-1 flex items-center gap-2 font-semibold text-foreground">
+                    <Phone size={15} />
                     {selectedRequest.customerPhone}
                   </p>
                 </div>
 
                 <div className="rounded-xl bg-background p-4">
-                  <p className="text-xs text-muted">Device</p>
-                  <p className="mt-1 font-semibold text-foreground">
-                    {selectedRequest.deviceName}
-                  </p>
-                </div>
-
-                <div className="rounded-xl bg-background p-4">
                   <p className="text-xs text-muted">Service Price</p>
+
                   <p className="mt-1 font-semibold text-foreground">
                     ৳{selectedRequest.servicePrice}
                   </p>
@@ -683,41 +687,60 @@ useEffect(() => {
 
                 <div className="rounded-xl bg-background p-4">
                   <p className="text-xs text-muted">Preferred Date</p>
+
                   <p className="mt-1 font-semibold text-foreground">
-                    {selectedRequest.preferredDate}
+                    {formatDate(selectedRequest.preferredDate)}
                   </p>
                 </div>
 
                 <div className="rounded-xl bg-background p-4">
-                  <p className="text-xs text-muted">Preferred Time</p>
+                  <p className="text-xs text-muted">Request Status</p>
+
                   <p className="mt-1 font-semibold text-foreground">
-                    {selectedRequest.preferredTime}
+                    {formatStatus(selectedRequest.status)}
+                  </p>
+                </div>
+
+                <div className="rounded-xl bg-background p-4">
+                  <p className="text-xs text-muted">Payment Status</p>
+
+                  <p className="mt-1 flex items-center gap-2 font-semibold text-foreground">
+                    <CreditCard size={15} />
+                    {formatStatus(selectedRequest.paymentStatus)}
                   </p>
                 </div>
               </div>
 
+              {/* Customer Email */}
               <div>
-                <p className="text-sm font-semibold text-foreground">
+                <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <Mail size={16} />
                   Customer Email
                 </p>
+
                 <p className="mt-1 text-sm text-muted">
                   {selectedRequest.customerEmail}
                 </p>
               </div>
 
+              {/* Address */}
               <div>
-                <p className="text-sm font-semibold text-foreground">
+                <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <MapPin size={16} />
                   Service Address
                 </p>
+
                 <p className="mt-1 text-sm text-muted">
                   {selectedRequest.address}
                 </p>
               </div>
 
+              {/* Problem Description */}
               <div>
                 <p className="text-sm font-semibold text-foreground">
                   Problem Description
                 </p>
+
                 <p className="mt-2 rounded-xl bg-background p-4 text-sm leading-7 text-muted">
                   {selectedRequest.problemDescription}
                 </p>
@@ -725,53 +748,7 @@ useEffect(() => {
 
               {/* Modal Actions */}
               <div className="flex flex-wrap gap-3 border-t border-border pt-5">
-                {selectedRequest.status === "pending" && (
-                  <>
-                    <button
-                      disabled={updatingId === selectedRequest._id}
-                      onClick={() =>
-                        handleStatusUpdate(selectedRequest._id, "accepted")
-                      }
-                      className="flex-1 rounded-xl bg-[#102b25] px-4 py-3 text-sm font-semibold text-[#b9e769] disabled:opacity-50"
-                    >
-                      Accept Request
-                    </button>
-
-                    <button
-                      disabled={updatingId === selectedRequest._id}
-                      onClick={() =>
-                        handleStatusUpdate(selectedRequest._id, "rejected")
-                      }
-                      className="flex-1 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-600 disabled:opacity-50"
-                    >
-                      Reject Request
-                    </button>
-                  </>
-                )}
-
-                {selectedRequest.status === "accepted" && (
-                  <button
-                    disabled={updatingId === selectedRequest._id}
-                    onClick={() =>
-                      handleStatusUpdate(selectedRequest._id, "in-progress")
-                    }
-                    className="flex-1 rounded-xl bg-purple-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
-                  >
-                    Start Job
-                  </button>
-                )}
-
-                {selectedRequest.status === "in-progress" && (
-                  <button
-                    disabled={updatingId === selectedRequest._id}
-                    onClick={() =>
-                      handleStatusUpdate(selectedRequest._id, "completed")
-                    }
-                    className="flex-1 rounded-xl bg-green-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
-                  >
-                    Mark as Completed
-                  </button>
-                )}
+                {renderActions(selectedRequest, true)}
               </div>
             </div>
           </div>

@@ -1,45 +1,69 @@
 
 import Link from "next/link";
-import { ArrowRight, Clock } from "lucide-react";
 
-const requests = [
-  {
-    id: 1,
-    customer: "Rahim Ahmed",
-    service: "Mobile Screen Replacement",
-    date: "Nov 18, 2026",
-    status: "Pending",
-  },
-  {
-    id: 2,
-    customer: "Karim Hasan",
-    service: "Laptop Repair",
-    date: "Nov 17, 2026",
-    status: "Accepted",
-  },
-  {
-    id: 3,
-    customer: "Sakib Hossain",
-    service: "Computer Troubleshooting",
-    date: "Nov 16, 2026",
-    status: "Completed",
-  },
-];
+import {
+  ArrowRight,
+  Clock,
+  ClipboardList,
+} from "lucide-react";
 
-const statusStyles: Record<string, string> = {
-  Pending: "bg-amber-500/10 text-amber-600",
-  Accepted: "bg-blue-500/10 text-blue-600",
-  Completed: "bg-emerald-500/10 text-emerald-600",
+import type { ServiceRequest } from "@/app/dashboard/technician/page";
+
+interface RecentRequestsProps {
+  requests: ServiceRequest[];
+  loading: boolean;
+}
+
+const statusStyles: Record<ServiceRequest["status"], string> = {
+  requested: "bg-amber-500/10 text-amber-600",
+  accepted: "bg-blue-500/10 text-blue-600",
+  rejected: "bg-red-500/10 text-red-600",
+  "in-progress": "bg-purple-500/10 text-purple-600",
+  completed: "bg-emerald-500/10 text-emerald-600",
 };
 
-export default function RecentRequests() {
+const formatStatus = (status: string) =>
+  status.replace("-", " ").replace(/\b\w/g, (char) =>
+    char.toUpperCase()
+  );
+
+const formatDate = (date: string) => {
+  if (!date) return "Date not available";
+
+  const parsedDate = new Date(date);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return date;
+  }
+
+  return parsedDate.toLocaleDateString("en-BD", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+export default function RecentRequests({
+  requests,
+  loading,
+}: RecentRequestsProps) {
+  const recentRequests = [...requests]
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() -
+        new Date(a.createdAt).getTime()
+    )
+    .slice(0, 5);
+
   return (
     <section className="rounded-2xl border border-border bg-surface p-5 shadow-sm">
+      {/* Header */}
       <div className="mb-6 flex items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-foreground">
             Recent Requests
           </h2>
+
           <p className="mt-1 text-sm text-muted">
             Latest customer service requests
           </p>
@@ -53,37 +77,69 @@ export default function RecentRequests() {
         </Link>
       </div>
 
-      <div className="space-y-4">
-        {requests.map((request) => (
-          <div
-            key={request.id}
-            className="flex flex-col gap-3 border-b border-border pb-4 last:border-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
-          >
-            <div>
-              <h3 className="font-semibold text-foreground">
-                {request.service}
-              </h3>
-
-              <p className="mt-1 text-sm text-muted">
-                Customer: {request.customer}
-              </p>
-
-              <p className="mt-1 flex items-center gap-1 text-xs text-muted">
-                <Clock size={13} />
-                {request.date}
-              </p>
-            </div>
-
-            <span
-              className={`w-fit rounded-full px-3 py-1 text-xs font-semibold ${
-                statusStyles[request.status]
-              }`}
+      {/* Loading */}
+      {loading ? (
+        <div className="space-y-4">
+          {[1, 2, 3].map((item) => (
+            <div
+              key={item}
+              className="animate-pulse space-y-2 border-b border-border pb-4 last:border-0"
             >
-              {request.status}
-            </span>
+              <div className="h-4 w-1/3 rounded bg-accent" />
+              <div className="h-3 w-1/2 rounded bg-accent" />
+              <div className="h-3 w-1/4 rounded bg-accent" />
+            </div>
+          ))}
+        </div>
+      ) : recentRequests.length === 0 ? (
+        /* Empty State */
+        <div className="flex min-h-48 flex-col items-center justify-center text-center">
+          <div className="rounded-2xl bg-primary/10 p-4">
+            <ClipboardList size={30} className="text-primary" />
           </div>
-        ))}
-      </div>
+
+          <h3 className="mt-4 font-semibold text-foreground">
+            No requests yet
+          </h3>
+
+          <p className="mt-2 text-sm text-muted">
+            Customer repair requests will appear here.
+          </p>
+        </div>
+      ) : (
+        /* Request List */
+        <div className="space-y-4">
+          {recentRequests.map((request) => (
+            <div
+              key={request._id}
+              className="flex flex-col gap-3 border-b border-border pb-4 last:border-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="min-w-0">
+                <h3 className="font-semibold text-foreground">
+                  {request.serviceTitle}
+                </h3>
+
+                <p className="mt-1 text-sm text-muted">
+                  Customer: {request.customerName}
+                </p>
+
+                <p className="mt-1 flex items-center gap-1 text-xs text-muted">
+                  <Clock size={13} />
+                  Preferred date: {formatDate(request.preferredDate)}
+                </p>
+              </div>
+
+              <span
+                className={`w-fit shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
+                  statusStyles[request.status]
+                }`}
+              >
+                {formatStatus(request.status)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
