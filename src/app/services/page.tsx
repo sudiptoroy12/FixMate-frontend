@@ -1,14 +1,31 @@
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Wrench, RefreshCw, Search } from "lucide-react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import {
+  useSearchParams,
+  useRouter,
+  usePathname,
+} from "next/navigation";
 
+import { Wrench, RefreshCw, Search } from "lucide-react";
 
 import { getAllServices } from "@/lib/services-api";
 import type { Service } from "@/types/service";
+
 import ServiceFilters from "../components/services/ServiceFilters";
 import ServiceCard from "../components/services/ServiceCard";
+
+const categories = [
+  "All Categories",
+  "Smartphone",
+  "Laptop & PC",
+  "AC",
+  "Refrigerator",
+  "TV",
+  "Washing Machine",
+  "Electrical",
+];
 
 function ServiceSkeleton() {
   return (
@@ -29,74 +46,105 @@ function ServiceSkeleton() {
   );
 }
 
-export default function ServicesPage() {
+function ServicesPageContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // Get selected category from URL
+  const queryCategory = searchParams.get("category");
+
+  const category =
+    queryCategory && categories.includes(queryCategory)
+      ? queryCategory
+      : "All Categories";
+
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("All Categories");
   const [sort, setSort] = useState("newest");
 
+  // Update category in URL
+  const handleCategoryChange = (value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
 
-const fetchServices = async () => {
-  try {
-    setError("");
+    if (value === "All Categories") {
+      params.delete("category");
+    } else {
+      params.set("category", value);
+    }
 
-    const data = await getAllServices();
+    const queryString = params.toString();
 
-    setServices(
-      data.filter(
-        (service) =>
-          service.approvalStatus === "approved" &&
-          service.isAvailable === true
-      )
+    router.replace(
+      queryString ? `${pathname}?${queryString}` : pathname,
+      { scroll: false }
     );
-  } catch (err) {
-    console.error("Fetch services error:", err);
-    setError("Unable to load services. Please try again.");
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
-useEffect(() => {
-  let ignore = false;
-
-  const loadServices = async () => {
+  // Fetch services
+  const fetchServices = async () => {
     try {
+      setLoading(true);
+      setError("");
+
       const data = await getAllServices();
 
-      if (!ignore) {
-        setServices(
-          data.filter(
-            (service) =>
-              service.approvalStatus === "approved" &&
-              service.isAvailable === true
-          )
-        );
-      }
+      setServices(
+        data.filter(
+          (service) =>
+            service.approvalStatus === "approved" &&
+            service.isAvailable === true
+        )
+      );
     } catch (err) {
       console.error("Fetch services error:", err);
-
-      if (!ignore) {
-        setError("Unable to load services. Please try again.");
-      }
+      setError("Unable to load services. Please try again.");
     } finally {
-      if (!ignore) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   };
 
-  loadServices();
+  // Initial services loading
+  useEffect(() => {
+    let ignore = false;
 
-  return () => {
-    ignore = true;
-  };
-}, []);
+    const loadServices = async () => {
+      try {
+        const data = await getAllServices();
 
+        if (!ignore) {
+          setServices(
+            data.filter(
+              (service) =>
+                service.approvalStatus === "approved" &&
+                service.isAvailable === true
+            )
+          );
+        }
+      } catch (err) {
+        console.error("Fetch services error:", err);
 
+        if (!ignore) {
+          setError("Unable to load services. Please try again.");
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadServices();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  // Search, category filtering and sorting
   const filteredServices = useMemo(() => {
     let result = [...services];
 
@@ -147,14 +195,19 @@ useEffect(() => {
     return result;
   }, [services, search, category, sort]);
 
+  // Clear all filters
+  const clearFilters = () => {
+    setSearch("");
+    setSort("newest");
+    handleCategoryChange("All Categories");
+  };
+
   return (
     <main className="min-h-screen bg-gray-50 py-12 dark:bg-gray-950">
-
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
 
         {/* Header */}
         <div className="mb-10 text-center">
-
           <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-[#167d68]/10 px-4 py-2 text-sm font-semibold text-[#167d68]">
             <Wrench size={17} />
             Professional Repair Services
@@ -169,7 +222,6 @@ useEffect(() => {
             Explore professional repair services from experienced
             technicians. Get reliable solutions for all your devices.
           </p>
-
         </div>
 
         {/* Search and Filters */}
@@ -177,17 +229,18 @@ useEffect(() => {
           search={search}
           setSearch={setSearch}
           category={category}
-          setCategory={setCategory}
+          setCategory={handleCategoryChange}
           sort={sort}
           setSort={setSort}
         />
 
-        {/* Results */}
+        {/* Results Header */}
         <div className="mb-6 mt-8 flex items-center justify-between">
-
           <div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-              Available Services
+              {category === "All Categories"
+                ? "Available Services"
+                : `${category} Repair Services`}
             </h2>
 
             {!loading && (
@@ -208,7 +261,6 @@ useEffect(() => {
             />
             Refresh
           </button>
-
         </div>
 
         {/* Loading */}
@@ -223,7 +275,6 @@ useEffect(() => {
         {/* Error */}
         {!loading && error && (
           <div className="rounded-2xl border border-red-200 bg-red-50 p-10 text-center dark:border-red-900 dark:bg-red-950/20">
-
             <p className="font-semibold text-red-600 dark:text-red-400">
               {error}
             </p>
@@ -234,7 +285,6 @@ useEffect(() => {
             >
               Try Again
             </button>
-
           </div>
         )}
 
@@ -253,7 +303,6 @@ useEffect(() => {
         {/* Empty State */}
         {!loading && !error && filteredServices.length === 0 && (
           <div className="rounded-2xl border border-dashed border-gray-300 bg-white px-5 py-16 text-center dark:border-gray-700 dark:bg-gray-900">
-
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#167d68]/10">
               <Search size={30} className="text-[#167d68]" />
             </div>
@@ -268,20 +317,35 @@ useEffect(() => {
             </p>
 
             <button
-              onClick={() => {
-                setSearch("");
-                setCategory("All Categories");
-                setSort("newest");
-              }}
+              onClick={clearFilters}
               className="mt-6 rounded-xl bg-[#167d68] px-6 py-3 font-semibold text-white transition hover:bg-[#126653]"
             >
               Clear Filters
             </button>
-
           </div>
         )}
-
       </div>
     </main>
+  );
+}
+
+// Suspense boundary for useSearchParams()
+export default function ServicesPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-gray-50 py-12 dark:bg-gray-950">
+          <div className="mx-auto max-w-7xl px-4">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {Array.from({ length: 8 }).map((_, index) => (
+                <ServiceSkeleton key={index} />
+              ))}
+            </div>
+          </div>
+        </main>
+      }
+    >
+      <ServicesPageContent />
+    </Suspense>
   );
 }
