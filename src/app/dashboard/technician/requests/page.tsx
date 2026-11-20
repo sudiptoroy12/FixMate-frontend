@@ -52,6 +52,7 @@ interface ServiceRequest {
     | "completed";
 
   paymentStatus: "unpaid" | "paid";
+  finalAmount?: number;
 
   createdAt: string;
   updatedAt: string;
@@ -82,6 +83,7 @@ export default function TechnicianRequestsPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [selectedRequest, setSelectedRequest] =
     useState<ServiceRequest | null>(null);
+    const [finalAmount, setFinalAmount] = useState("");
 
   // Fetch technician requests
  const fetchRequests = useCallback(async () => {
@@ -134,68 +136,95 @@ useEffect(() => {
 }, [fetchRequests]);
 
   // Update request status
-  const handleStatusUpdate = async (
-    id: string,
-    status: ServiceRequest["status"]
-  ) => {
-    try {
-      if (!API_URL) {
-        throw new Error("API URL is not configured.");
-      }
-
-      setUpdatingId(id);
-
-      const token = await getTokenFromClient();
-
-      const response = await fetch(
-        `${API_URL}/api/service-requests/${id}/status`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ status }),
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(
-          result.message || "Failed to update request."
-        );
-      }
-
-      toast.success(
-        result.message || "Request updated successfully!"
-      );
-
-      setRequests((previous) =>
-        previous.map((request) =>
-          request._id === id
-            ? { ...request, status }
-            : request
-        )
-      );
-
-      setSelectedRequest((previous) =>
-        previous?._id === id
-          ? { ...previous, status }
-          : previous
-      );
-    } catch (error) {
-      console.error("Update request error:", error);
-
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Something went wrong!"
-      );
-    } finally {
-      setUpdatingId(null);
+ const handleStatusUpdate = async (
+  id: string,
+  status: ServiceRequest["status"],
+  amount?: number
+) => {
+  try {
+    if (!API_URL) {
+      throw new Error("API URL is not configured.");
     }
-  };
+
+    if (status === "completed" && (!amount || amount <= 0)) {
+      toast.error("Please enter a valid final amount.");
+      return;
+    }
+
+    setUpdatingId(id);
+
+    const token = await getTokenFromClient();
+
+    const response = await fetch(
+      `${API_URL}/api/service-requests/${id}/status`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          status,
+          ...(status === "completed" && { finalAmount: amount }),
+        }),
+      }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      throw new Error(
+        result.message || "Failed to update request."
+      );
+    }
+
+    toast.success(
+      result.message || "Request updated successfully!"
+    );
+
+    setRequests((previous) =>
+      previous.map((request) =>
+        request._id === id
+          ? {
+              ...request,
+              status,
+              ...(status === "completed" && {
+                finalAmount: amount,
+                paymentStatus: "unpaid" as const,
+              }),
+            }
+          : request
+      )
+    );
+
+    setSelectedRequest((previous) =>
+      previous?._id === id
+        ? {
+            ...previous,
+            status,
+            ...(status === "completed" && {
+              finalAmount: amount,
+              paymentStatus: "unpaid" as const,
+            }),
+          }
+        : previous
+    );
+
+    if (status === "completed") {
+      setFinalAmount("");
+    }
+  } catch (error) {
+    console.error("Update request error:", error);
+
+    toast.error(
+      error instanceof Error
+        ? error.message
+        : "Something went wrong!"
+    );
+  } finally {
+    setUpdatingId(null);
+  }
+};
 
   // Search and filter
   const filteredRequests = useMemo(() => {
@@ -307,17 +336,27 @@ useEffect(() => {
           </button>
         )}
 
-        {request.status === "in-progress" && (
-          <button
-            disabled={isUpdating}
-            onClick={() =>
-              handleStatusUpdate(request._id, "completed")
-            }
-            className={`${buttonClass} bg-green-600 text-white`}
-          >
-            {isUpdating ? "Updating..." : modal ? "Mark as Completed" : "Complete"}
-          </button>
-        )}
+       {request.status === "in-progress" && (
+  <button
+    disabled={isUpdating}
+    onClick={() => {
+      if (modal) {
+        const amount = Number(finalAmount);
+        handleStatusUpdate(request._id, "completed", amount);
+      } else {
+        setFinalAmount("");
+        setSelectedRequest(request);
+      }
+    }}
+    className={`${buttonClass} bg-green-600 text-white`}
+  >
+    {isUpdating
+      ? "Updating..."
+      : modal
+        ? "Mark as Completed"
+        : "Complete"}
+  </button>
+)}
       </>
     );
   };
@@ -746,10 +785,48 @@ useEffect(() => {
                 </p>
               </div>
 
-              {/* Modal Actions */}
-              <div className="flex flex-wrap gap-3 border-t border-border pt-5">
-                {renderActions(selectedRequest, true)}
-              </div>
+             {/* Final Amount Input */}
+{selectedRequest.status === "in-progress" && (
+  <div className="rounded-xl border border-green-200 bg-green-50 p-4">
+    <label
+      htmlFor="finalAmount"
+      className="mb-2 block text-sm font-semibold text-green-900"
+    >
+      Final Repair Amount (৳)
+    </label>
+
+    <input
+      id="finalAmount"
+      type="number"
+      min="1"
+      step="0.01"
+      placeholder="Enter final repair amount"
+      value={finalAmount}
+      onChange={(e) => setFinalAmount(e.target.value)}
+      className="w-full rounded-lg border border-green-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
+    />
+
+    <p className="mt-2 text-xs text-green-800">
+      Enter the total amount the customer needs to pay.
+    </p>
+  </div>
+)}
+
+{/* Final Amount Display */}
+{selectedRequest.status === "completed" &&
+  selectedRequest.finalAmount !== undefined && (
+    <div className="rounded-xl bg-background p-4">
+      <p className="text-xs text-muted">Final Repair Amount</p>
+      <p className="mt-1 text-xl font-bold text-green-600">
+        ৳{selectedRequest.finalAmount}
+      </p>
+    </div>
+  )}
+
+{/* Modal Actions */}
+<div className="flex flex-wrap gap-3 border-t border-border pt-5">
+  {renderActions(selectedRequest, true)}
+</div>
             </div>
           </div>
         </div>

@@ -29,7 +29,7 @@ const quickLinks = [
   },
   {
     label: "About",
-    href: "/about",
+    href: "/#about",
     icon: Info,
   },
 ];

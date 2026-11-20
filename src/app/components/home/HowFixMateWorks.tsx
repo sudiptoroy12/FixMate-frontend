@@ -40,7 +40,7 @@ const steps = [
 
 export default function HowFixMateWorks() {
   return (
-    <section className="bg-surface py-16 sm:py-20">
+    <section id="about" className="bg-surface py-16 sm:py-20 ">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
 
         {/* Heading */}
