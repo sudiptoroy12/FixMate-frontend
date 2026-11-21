@@ -1,4 +1,3 @@
-
 "use client";
 
 import { authClient } from "@/lib/auth-client";
@@ -17,6 +16,8 @@ import {
   ShieldCheck,
   UserRound,
   Wrench,
+   Phone,
+    MapPin,
   X,
   Upload,
   BriefcaseBusiness,
@@ -32,8 +33,7 @@ const ProfilePage = () => {
   // FixMate design tokens
   const pageBackground = "min-h-screen bg-background text-foreground";
 
-  const card =
-    "rounded-3xl border border-border bg-surface shadow-sm";
+  const card = "rounded-3xl border border-border bg-surface shadow-sm";
 
   const heading = "font-bold text-foreground";
 
@@ -48,14 +48,16 @@ const ProfilePage = () => {
   const primaryButton =
     "inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60";
 
-  const handleUpdateProfile = async (
-    e: FormEvent<HTMLFormElement>
-  ) => {
+  const handleUpdateProfile = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     const formData = new FormData(e.currentTarget);
 
     const name = String(formData.get("name") ?? "").trim();
+    const phone = String(formData.get("phone") ?? "").trim();
+    const area = String(formData.get("area") ?? "").trim();
+    const bio = String(formData.get("bio") ?? "").trim();
+
     const imageFile = formData.get("image") as File | null;
     const removeImage = formData.get("removeImage") === "on";
 
@@ -64,12 +66,13 @@ const ProfilePage = () => {
       return;
     }
 
+    if (phone && !/^[0-9+\-\s()]{7,20}$/.test(phone)) {
+      toast.error("Please enter a valid phone number.");
+      return;
+    }
+
     if (imageFile && imageFile.size > 0) {
-      const allowedTypes = [
-        "image/jpeg",
-        "image/png",
-        "image/webp",
-      ];
+      const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
 
       if (!allowedTypes.includes(imageFile.type)) {
         toast.error("Only JPG, PNG and WEBP images are allowed.");
@@ -87,7 +90,7 @@ const ProfilePage = () => {
     try {
       let imageUrl = user?.image || "";
 
-      // Upload a new image to ImgBB
+      // Upload new profile photo
       if (imageFile && imageFile.size > 0) {
         const uploadData = new FormData();
         uploadData.append("image", imageFile);
@@ -104,30 +107,31 @@ const ProfilePage = () => {
           !uploadResult.success ||
           !uploadResult.imageUrl
         ) {
-          throw new Error(
-            uploadResult.error || "Image upload failed."
-          );
+          throw new Error(uploadResult.error || "Image upload failed.");
         }
 
         imageUrl = uploadResult.imageUrl;
       }
 
-      // Remove current profile photo
+      // Remove existing photo
       if (removeImage) {
         imageUrl = "";
       }
 
+      // Update Better Auth user information
       const { error } = await authClient.updateUser({
         name,
         image: imageUrl,
+        phone,
+        area,
+        bio,
       });
 
       if (error) {
-        toast.error(
-          error.message || "Unable to update your profile."
-        );
-        return;
+        throw new Error(error.message || "Unable to update your profile.");
       }
+
+      await authClient.getSession();
 
       toast.success("Profile updated successfully.");
       setShow(false);
@@ -137,7 +141,7 @@ const ProfilePage = () => {
       toast.error(
         error instanceof Error
           ? error.message
-          : "Something went wrong. Please try again."
+          : "Something went wrong. Please try again.",
       );
     } finally {
       setIsUpdating(false);
@@ -176,10 +180,7 @@ const ProfilePage = () => {
             Sign in to view and manage your FixMate profile.
           </p>
 
-          <Link
-            href="/signin"
-            className={`${primaryButton} mt-6 w-full`}
-          >
+          <Link href="/signin" className={`${primaryButton} mt-6 w-full`}>
             Sign In
           </Link>
 
@@ -195,8 +196,7 @@ const ProfilePage = () => {
     );
   }
 
-  const initial =
-    user.name?.trim().charAt(0).toUpperCase() || "U";
+  const initial = user.name?.trim().charAt(0).toUpperCase() || "U";
 
   const role = user.role || "customer";
 
@@ -238,9 +238,7 @@ const ProfilePage = () => {
 
           <ChevronRight size={15} className="text-muted-foreground" />
 
-          <span className="font-semibold text-primary">
-            My Profile
-          </span>
+          <span className="font-semibold text-primary">My Profile</span>
         </nav>
 
         {/* Page Heading */}
@@ -254,9 +252,11 @@ const ProfilePage = () => {
             My Profile
           </h1>
 
-          <p className={`mt-3 max-w-2xl text-sm leading-6 sm:text-base ${mutedText}`}>
-            Manage your personal information and keep your account details up
-            to date.
+          <p
+            className={`mt-3 max-w-2xl text-sm leading-6 sm:text-base ${mutedText}`}
+          >
+            Manage your personal information and keep your account details up to
+            date.
           </p>
         </div>
 
@@ -297,11 +297,15 @@ const ProfilePage = () => {
 
                 {/* User Details */}
                 <div className="z-10 min-w-0 pb-1">
-                  <h2 className={`break-words text-2xl sm:text-3xl ${heading} text-white`}>
+                  <h2
+                    className={`break-words text-2xl sm:text-3xl ${heading} text-white`}
+                  >
                     {user.name || "FixMate User"}
                   </h2>
 
-                  <p className={`mt-1 break-all text-sm ${mutedText} text-black` }>
+                  <p
+                    className={`mt-1 break-all text-sm ${mutedText} text-black`}
+                  >
                     {user.email}
                   </p>
 
@@ -338,9 +342,7 @@ const ProfilePage = () => {
             </div>
 
             <div>
-              <h2 className={`text-lg ${heading}`}>
-                Personal Information
-              </h2>
+              <h2 className={`text-lg ${heading}`}>Personal Information</h2>
 
               <p className={`mt-1 text-sm ${mutedText}`}>
                 Your basic FixMate account details.
@@ -351,7 +353,9 @@ const ProfilePage = () => {
           {!show ? (
             <div className="grid gap-5 pt-6 sm:grid-cols-2">
               <div className={detailCard}>
-                <div className={`flex items-center gap-2 text-sm font-medium ${mutedText}`}>
+                <div
+                  className={`flex items-center gap-2 text-sm font-medium ${mutedText}`}
+                >
                   <UserRound size={17} />
                   Full Name
                 </div>
@@ -362,7 +366,9 @@ const ProfilePage = () => {
               </div>
 
               <div className={detailCard}>
-                <div className={`flex items-center gap-2 text-sm font-medium ${mutedText}`}>
+                <div
+                  className={`flex items-center gap-2 text-sm font-medium ${mutedText}`}
+                >
                   <Mail size={17} />
                   Email Address
                 </div>
@@ -373,18 +379,20 @@ const ProfilePage = () => {
               </div>
 
               <div className={detailCard}>
-                <div className={`flex items-center gap-2 text-sm font-medium ${mutedText}`}>
+                <div
+                  className={`flex items-center gap-2 text-sm font-medium ${mutedText}`}
+                >
                   <BriefcaseBusiness size={17} />
                   Account Role
                 </div>
 
-                <p className={`mt-3 font-semibold ${heading}`}>
-                  {roleLabel}
-                </p>
+                <p className={`mt-3 font-semibold ${heading}`}>{roleLabel}</p>
               </div>
 
               <div className={detailCard}>
-                <div className={`flex items-center gap-2 text-sm font-medium ${mutedText}`}>
+                <div
+                  className={`flex items-center gap-2 text-sm font-medium ${mutedText}`}
+                >
                   <Camera size={17} />
                   Profile Photo
                 </div>
@@ -395,6 +403,43 @@ const ProfilePage = () => {
                     : "No profile photo added"}
                 </p>
               </div>
+
+{/* Phone Number */}
+<div className={detailCard}>
+  <div className={`flex items-center gap-2 text-sm font-medium ${mutedText}`}>
+    <Phone size={17} />
+    Phone Number
+  </div>
+
+  <p className={`mt-3 break-words font-semibold ${heading}`}>
+    {user.phone || "Not provided"}
+  </p>
+</div>
+
+{/* Area */}
+<div className={detailCard}>
+  <div className={`flex items-center gap-2 text-sm font-medium ${mutedText}`}>
+    <MapPin size={17} />
+    Area / Location
+  </div>
+
+  <p className={`mt-3 break-words font-semibold ${heading}`}>
+    {user.area || "Not provided"}
+  </p>
+</div>
+
+{/* Bio */}
+<div className={detailCard}>
+  <div className={`flex items-center gap-2 text-sm font-medium ${mutedText}`}>
+    <UserRound size={17} />
+    About Me
+  </div>
+
+  <p className={`mt-3 break-words text-sm font-medium ${heading}`}>
+    {user.bio || "No bio added yet."}
+  </p>
+</div>
+
             </div>
           ) : (
             <form onSubmit={handleUpdateProfile} className="space-y-6 pt-6">
@@ -442,6 +487,71 @@ const ProfilePage = () => {
                 </p>
               </div>
 
+              {/* Phone Number */}
+              <div>
+                <label
+                  htmlFor="phone"
+                  className="mb-2 block text-sm font-semibold text-foreground"
+                >
+                  Phone Number
+                </label>
+
+                <input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  defaultValue={user.phone || ""}
+                  placeholder="Enter your phone number"
+                  autoComplete="tel"
+                  maxLength={20}
+                  className={inputClass}
+                />
+              </div>
+
+              {/* Area */}
+              <div>
+                <label
+                  htmlFor="area"
+                  className="mb-2 block text-sm font-semibold text-foreground"
+                >
+                  Area / Location
+                </label>
+
+                <input
+                  id="area"
+                  name="area"
+                  type="text"
+                  defaultValue={user.area || ""}
+                  placeholder="e.g. Mirpur, Dhaka"
+                  maxLength={150}
+                  className={inputClass}
+                />
+              </div>
+
+              {/* Bio */}
+              <div>
+                <label
+                  htmlFor="bio"
+                  className="mb-2 block text-sm font-semibold text-foreground"
+                >
+                  About Me
+                </label>
+
+                <textarea
+                  id="bio"
+                  name="bio"
+                  rows={4}
+                  defaultValue={user.bio || ""}
+                  placeholder="Tell us a little about yourself..."
+                  maxLength={500}
+                  className={`${inputClass} resize-none`}
+                />
+
+                <p className={`mt-2 text-xs ${mutedText}`}>
+                  Maximum 500 characters.
+                </p>
+              </div>
+
               {/* Profile Image Upload */}
               <div>
                 <label
@@ -463,10 +573,7 @@ const ProfilePage = () => {
                           className="h-full w-full object-cover"
                         />
                       ) : (
-                        <CircleUserRound
-                          size={38}
-                          className="text-primary"
-                        />
+                        <CircleUserRound size={38} className="text-primary" />
                       )}
                     </div>
 
@@ -541,9 +648,7 @@ const ProfilePage = () => {
 
         {/* Account Navigation */}
         <section className={`${card} mt-7 p-5 sm:p-6`}>
-          <h2 className={`text-lg ${heading}`}>
-            Your FixMate Account
-          </h2>
+          <h2 className={`text-lg ${heading}`}>Your FixMate Account</h2>
 
           <p className={`mt-1 text-sm ${mutedText}`}>
             Continue managing your account and services.
@@ -566,32 +671,6 @@ const ProfilePage = () => {
 
                   <span className={`mt-1 block text-xs ${mutedText}`}>
                     Manage your account
-                  </span>
-                </span>
-              </span>
-
-              <ChevronRight
-                size={18}
-                className="text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary"
-              />
-            </Link>
-
-            <Link
-              href="/my-bookings"
-              className="group flex items-center justify-between rounded-2xl border border-border p-4 transition hover:border-primary hover:bg-surface-hover"
-            >
-              <span className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary/20 text-primary">
-                  <CheckCircle2 size={21} />
-                </span>
-
-                <span>
-                  <span className={`block text-sm font-semibold ${heading}`}>
-                    My Bookings
-                  </span>
-
-                  <span className={`mt-1 block text-xs ${mutedText}`}>
-                    View your service bookings
                   </span>
                 </span>
               </span>

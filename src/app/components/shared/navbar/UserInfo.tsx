@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -7,9 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   LayoutDashboard,
-  PlusCircle,
-  Building2,
-  CalendarCheck,
+
   UserRound,
   LogOut,
   LogIn,
@@ -20,20 +17,6 @@ import { toast } from "react-toastify";
 
 import { authClient } from "@/lib/auth-client";
 import UserInfoSkeleton from "./UserInfoSkeleton";
-
-const menuLinks = [
-  {
-    label: "Dashboard",
-    href: "/dashboard",
-    icon: LayoutDashboard,
-  },
-
-  {
-    label: "My Bookings",
-    href: "/my-bookings",
-    icon: CalendarCheck,
-  },
-];
 
 const menuLinkClass =
   "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-200 transition-all duration-200 hover:bg-white/10 hover:text-[#b9e769]";
@@ -46,6 +29,25 @@ const UserInfo = () => {
 
   const { data: session, isPending } = authClient.useSession();
   const user = session?.user;
+
+  const role = user?.role || "customer";
+
+  const dashboardPath =
+    role === "technician"
+      ? "/dashboard/technician"
+      : role === "admin"
+        ? "/dashboard/admin"
+        : "/dashboard/customer";
+
+  const menuLinks = [
+    {
+      label: "Dashboard",
+      href: dashboardPath,
+      icon: LayoutDashboard,
+    }
+
+   
+  ];
 
   // Close dropdown when clicking outside or pressing Escape.
   useEffect(() => {
@@ -170,7 +172,6 @@ const UserInfo = () => {
       {isOpen && (
         <div className="absolute right-0 top-full z-50 w-64 pt-2">
           <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#183a31] shadow-xl shadow-black/30">
-
             {/* User Information */}
             <div className="border-b border-white/10 bg-white/5 px-4 py-4">
               <div className="flex items-center gap-3">
@@ -193,9 +194,7 @@ const UserInfo = () => {
                     {userName}
                   </p>
 
-                  <p className="truncate text-xs text-gray-400">
-                    {userEmail}
-                  </p>
+                  <p className="truncate text-xs text-gray-400">{userEmail}</p>
                 </div>
               </div>
             </div>
@@ -226,7 +225,7 @@ const UserInfo = () => {
                 className={menuLinkClass}
               >
                 <UserRound size={17} />
-                My Profile
+                Edit Profile
               </Link>
 
               <button

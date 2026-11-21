@@ -74,7 +74,7 @@ export default function RepairRequestForm({
 
       toast.success("Repair request submitted successfully!");
 
-      router.push("/profile");
+      router.push("/dashboard/customer/bookings");
       router.refresh();
     } catch (error) {
       console.error("Repair request error:", error);
