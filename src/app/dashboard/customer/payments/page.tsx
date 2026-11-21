@@ -2,7 +2,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
+
 import {
   Search,
   RefreshCw,
@@ -23,6 +25,10 @@ import {
 import { getTokenFromClient } from "@/lib/(getToken)/getTokenFromClient";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+// ========================================
+// TYPES
+// ========================================
 
 interface Payment {
   _id: string;
@@ -53,10 +59,14 @@ interface ApiResponse {
   payments?: Payment[];
   data?: Payment[] | { payments?: Payment[] };
 }
-// ------------------------------------
-// Payment status helper
-// ------------------------------------
-function getPaymentStatus(payment: Payment) {
+
+type PaymentStatus = "success" | "failed" | "pending";
+
+// ========================================
+// PAYMENT STATUS HELPER
+// ========================================
+
+function getPaymentStatus(payment: Payment): PaymentStatus {
   const status = (
     payment.paymentStatus ||
     payment.status ||
@@ -78,9 +88,47 @@ function getPaymentStatus(payment: Payment) {
   return "pending";
 }
 
-// ------------------------------------
-// Status badge component
-// ------------------------------------
+// ========================================
+// AMOUNT HELPERS
+// ========================================
+
+function getAmount(payment: Payment) {
+  return Number(payment.amount ?? payment.totalAmount ?? 0);
+}
+
+// Only display amounts confirmed to be USD.
+// This prevents old BDT records from being displayed as USD.
+function isUsdPayment(payment: Payment) {
+  return payment.currency?.toUpperCase() === "USD";
+}
+
+function formatUsd(amount: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+function formatAmount(payment: Payment) {
+  if (!isUsdPayment(payment)) {
+    return "Currency unavailable";
+  }
+
+  const amount = getAmount(payment);
+
+  if (!Number.isFinite(amount) || amount < 0) {
+    return "Amount unavailable";
+  }
+
+  return formatUsd(amount);
+}
+
+// ========================================
+// STATUS BADGE COMPONENT
+// ========================================
+
 function StatusBadge({ payment }: { payment: Payment }) {
   const status = getPaymentStatus(payment);
 
@@ -109,6 +157,11 @@ function StatusBadge({ payment }: { payment: Payment }) {
     </span>
   );
 }
+
+// ========================================
+// MAIN CUSTOMER PAYMENTS PAGE
+// ========================================
+
 export default function CustomerPaymentsPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -124,13 +177,19 @@ export default function CustomerPaymentsPage() {
 
   // Stripe verification states
   const verifiedSessionRef = useRef<string | null>(null);
-  const [verificationLoading, setVerificationLoading] = useState(false);
-  const [verificationMessage, setVerificationMessage] = useState("");
+
+  const [verificationLoading, setVerificationLoading] =
+    useState(false);
+
+  const [verificationMessage, setVerificationMessage] =
+    useState("");
+
   const [verificationError, setVerificationError] = useState("");
 
-  // ------------------------------------
-  // Fetch customer payment history
-  // ------------------------------------
+  // ========================================
+  // FETCH CUSTOMER PAYMENT HISTORY
+  // ========================================
+
   useEffect(() => {
     let isMounted = true;
 
@@ -145,12 +204,17 @@ export default function CustomerPaymentsPage() {
 
         const token = await getTokenFromClient();
 
+        if (!token) {
+          throw new Error("Please sign in to view your payments.");
+        }
+
         const response = await fetch(
           `${API_URL}/api/payments/customer`,
           {
             method: "GET",
             headers: {
               Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
             },
             cache: "no-store",
           }
@@ -195,9 +259,10 @@ export default function CustomerPaymentsPage() {
     };
   }, [refreshKey]);
 
-  // ------------------------------------
-  // Verify Stripe Checkout payment
-  // ------------------------------------
+  // ========================================
+  // VERIFY STRIPE CHECKOUT PAYMENT
+  // ========================================
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
 
@@ -210,6 +275,8 @@ export default function CustomerPaymentsPage() {
 
     verifiedSessionRef.current = sessionId;
 
+    let isMounted = true;
+
     const verifyPayment = async () => {
       try {
         setVerificationLoading(true);
@@ -221,6 +288,10 @@ export default function CustomerPaymentsPage() {
         }
 
         const token = await getTokenFromClient();
+
+        if (!token) {
+          throw new Error("Please sign in to verify your payment.");
+        }
 
         const response = await fetch(
           `${API_URL}/api/payments/verify-session`,
@@ -242,6 +313,8 @@ export default function CustomerPaymentsPage() {
           );
         }
 
+        if (!isMounted) return;
+
         setVerificationMessage(
           "Your payment was successful and has been verified!"
         );
@@ -256,6 +329,8 @@ export default function CustomerPaymentsPage() {
           window.location.pathname
         );
       } catch (err) {
+        if (!isMounted) return;
+
         setVerificationError(
           err instanceof Error
             ? err.message
@@ -264,56 +339,22 @@ export default function CustomerPaymentsPage() {
 
         verifiedSessionRef.current = null;
       } finally {
-        setVerificationLoading(false);
+        if (isMounted) {
+          setVerificationLoading(false);
+        }
       }
     };
 
     verifyPayment();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // ------------------------------------
-  // Payment helper functions
-  // ------------------------------------
-  const getPaymentStatus = (payment: Payment) => {
-    const status = (
-      payment.paymentStatus ||
-      payment.status ||
-      "pending"
-    ).toLowerCase();
-
-    if (
-      ["paid", "success", "successful", "completed"].includes(status)
-    ) {
-      return "success";
-    }
-
-    if (
-      ["failed", "cancelled", "canceled", "rejected"].includes(status)
-    ) {
-      return "failed";
-    }
-
-    return "pending";
-  };
-
-  const getAmount = (payment: Payment) => {
-    return Number(payment.amount ?? payment.totalAmount ?? 0);
-  };
-
-  const formatAmount = (payment: Payment) => {
-    const amount = getAmount(payment);
-    const currency = (payment.currency || "BDT").toUpperCase();
-
-    try {
-      return new Intl.NumberFormat("en-BD", {
-        style: "currency",
-        currency,
-        maximumFractionDigits: 2,
-      }).format(amount);
-    } catch {
-      return `${currency} ${amount.toFixed(2)}`;
-    }
-  };
+  // ========================================
+  // PAYMENT HELPER FUNCTIONS
+  // ========================================
 
   const getTransactionId = (payment: Payment) => {
     return (
@@ -346,7 +387,7 @@ export default function CustomerPaymentsPage() {
       return "Not available";
     }
 
-    return parsedDate.toLocaleString("en-BD", {
+    return parsedDate.toLocaleString("en-US", {
       day: "2-digit",
       month: "short",
       year: "numeric",
@@ -355,9 +396,10 @@ export default function CustomerPaymentsPage() {
     });
   };
 
-  // ------------------------------------
-  // Payment statistics
-  // ------------------------------------
+  // ========================================
+  // PAYMENT STATISTICS
+  // ========================================
+
   const stats = useMemo(() => {
     const successfulPayments = payments.filter(
       (payment) => getPaymentStatus(payment) === "success"
@@ -367,10 +409,16 @@ export default function CustomerPaymentsPage() {
       (payment) => getPaymentStatus(payment) === "pending"
     );
 
-    const totalPaid = successfulPayments.reduce(
-      (total, payment) => total + getAmount(payment),
-      0
-    );
+    // Count only successful USD transactions.
+    const totalPaid = successfulPayments
+      .filter(isUsdPayment)
+      .reduce((total, payment) => {
+        const amount = getAmount(payment);
+
+        return Number.isFinite(amount) && amount >= 0
+          ? total + amount
+          : total;
+      }, 0);
 
     return {
       totalPaid,
@@ -380,16 +428,21 @@ export default function CustomerPaymentsPage() {
     };
   }, [payments]);
 
-  // ------------------------------------
-  // Search and filter payments
-  // ------------------------------------
+  // ========================================
+  // SEARCH AND FILTER PAYMENTS
+  // ========================================
+
   const filteredPayments = useMemo(() => {
     return payments.filter((payment) => {
       const searchValue = search.toLowerCase();
 
       const matchesSearch =
-        getServiceName(payment).toLowerCase().includes(searchValue) ||
-        getTransactionId(payment).toLowerCase().includes(searchValue) ||
+        getServiceName(payment)
+          .toLowerCase()
+          .includes(searchValue) ||
+        getTransactionId(payment)
+          .toLowerCase()
+          .includes(searchValue) ||
         (payment.bookingId || payment.serviceRequestId || "")
           .toLowerCase()
           .includes(searchValue);
@@ -402,11 +455,13 @@ export default function CustomerPaymentsPage() {
     });
   }, [payments, search, statusFilter]);
 
- 
+  // ========================================
+  // RENDER
+  // ========================================
 
   return (
     <div className="space-y-8 pb-10">
-      {/* Page heading */}
+      {/* PAGE HEADING */}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <p className="mb-2 text-sm font-medium text-primary">
@@ -435,7 +490,10 @@ export default function CustomerPaymentsPage() {
         </button>
       </div>
 
-      {/* Stripe verification messages */}
+      {/* ========================================
+          STRIPE VERIFICATION MESSAGES
+      ======================================== */}
+
       {verificationLoading && (
         <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300">
           <RefreshCw size={19} className="animate-spin" />
@@ -453,18 +511,24 @@ export default function CustomerPaymentsPage() {
       {verificationError && (
         <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400">
           <AlertCircle size={20} />
+
           <div className="flex-1">
-            <p className="font-semibold">Payment verification failed</p>
+            <p className="font-semibold">
+              Payment verification failed
+            </p>
+
             <p className="mt-1">{verificationError}</p>
           </div>
         </div>
       )}
 
-      {/* General error */}
+      {/* GENERAL ERROR */}
       {error && (
         <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400">
           <AlertCircle size={20} />
+
           <span>{error}</span>
+
           <button
             onClick={() => setRefreshKey((previous) => previous + 1)}
             className="ml-auto font-semibold underline"
@@ -474,70 +538,81 @@ export default function CustomerPaymentsPage() {
         </div>
       )}
 
-      {/* Statistics */}
+      {/* ========================================
+          STATISTICS
+      ======================================== */}
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {/* TOTAL PAID */}
         <div className="rounded-2xl border bg-card p-5">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">
                 Total Paid
               </p>
+
               <h2 className="mt-2 text-2xl font-bold">
-                {stats.totalPaid.toLocaleString("en-BD", {
-                  style: "currency",
-                  currency: "BDT",
-                  maximumFractionDigits: 2,
-                })}
+                {formatUsd(stats.totalPaid)}
               </h2>
             </div>
+
             <div className="rounded-xl bg-green-100 p-3 text-green-700 dark:bg-green-500/10 dark:text-green-400">
               <Wallet size={22} />
             </div>
           </div>
         </div>
 
+        {/* TRANSACTIONS */}
         <div className="rounded-2xl border bg-card p-5">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">
                 Transactions
               </p>
+
               <h2 className="mt-2 text-2xl font-bold">
                 {stats.transactions}
               </h2>
             </div>
+
             <div className="rounded-xl bg-blue-100 p-3 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400">
               <Receipt size={22} />
             </div>
           </div>
         </div>
 
+        {/* SUCCESSFUL PAYMENTS */}
         <div className="rounded-2xl border bg-card p-5">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">
                 Successful Payments
               </p>
+
               <h2 className="mt-2 text-2xl font-bold">
                 {stats.successful}
               </h2>
             </div>
+
             <div className="rounded-xl bg-green-100 p-3 text-green-700 dark:bg-green-500/10 dark:text-green-400">
               <CheckCircle2 size={22} />
             </div>
           </div>
         </div>
 
+        {/* PENDING PAYMENTS */}
         <div className="rounded-2xl border bg-card p-5">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">
                 Pending Payments
               </p>
+
               <h2 className="mt-2 text-2xl font-bold">
                 {stats.pending}
               </h2>
             </div>
+
             <div className="rounded-xl bg-yellow-100 p-3 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400">
               <Clock size={22} />
             </div>
@@ -545,26 +620,32 @@ export default function CustomerPaymentsPage() {
         </div>
       </div>
 
-      {/* Payment history */}
+      {/* ========================================
+          PAYMENT HISTORY
+      ======================================== */}
+
       <div className="overflow-hidden rounded-2xl border bg-card">
+        {/* HEADER */}
         <div className="border-b p-5">
           <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
             <div>
               <h2 className="text-lg font-semibold">
                 All Transactions
               </h2>
+
               <p className="mt-1 text-sm text-muted-foreground">
                 View your payment records and transaction details.
               </p>
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row">
-              {/* Search */}
+              {/* SEARCH */}
               <div className="relative">
                 <Search
                   size={17}
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
                 />
+
                 <input
                   type="text"
                   value={search}
@@ -574,10 +655,12 @@ export default function CustomerPaymentsPage() {
                 />
               </div>
 
-              {/* Status filter */}
+              {/* STATUS FILTER */}
               <select
                 value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value)}
+                onChange={(event) =>
+                  setStatusFilter(event.target.value)
+                }
                 className="rounded-xl border bg-background px-4 py-2.5 text-sm outline-none focus:border-primary"
               >
                 <option value="all">All Payments</option>
@@ -589,7 +672,7 @@ export default function CustomerPaymentsPage() {
           </div>
         </div>
 
-        {/* Loading */}
+        {/* LOADING */}
         {loading ? (
           <div className="space-y-4 p-5">
             {[1, 2, 3].map((item) => (
@@ -600,7 +683,7 @@ export default function CustomerPaymentsPage() {
             ))}
           </div>
         ) : filteredPayments.length === 0 ? (
-          /* Empty state */
+          /* EMPTY STATE */
           <div className="flex flex-col items-center justify-center px-5 py-16 text-center">
             <div className="mb-4 rounded-2xl bg-muted p-5">
               <CreditCard
@@ -633,7 +716,7 @@ export default function CustomerPaymentsPage() {
           </div>
         ) : (
           <>
-            {/* Desktop table */}
+            {/* DESKTOP TABLE */}
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full text-left text-sm">
                 <thead className="bg-muted/50 text-muted-foreground">
@@ -641,18 +724,23 @@ export default function CustomerPaymentsPage() {
                     <th className="px-5 py-4 font-medium">
                       Service
                     </th>
+
                     <th className="px-5 py-4 font-medium">
                       Transaction ID
                     </th>
+
                     <th className="px-5 py-4 font-medium">
-                      Amount
+                      Amount (USD)
                     </th>
+
                     <th className="px-5 py-4 font-medium">
                       Payment Date
                     </th>
+
                     <th className="px-5 py-4 font-medium">
                       Status
                     </th>
+
                     <th className="px-5 py-4 text-right font-medium">
                       Action
                     </th>
@@ -669,6 +757,7 @@ export default function CustomerPaymentsPage() {
                         <p className="font-semibold">
                           {getServiceName(payment)}
                         </p>
+
                         <p className="mt-1 text-xs text-muted-foreground">
                           Booking:{" "}
                           {payment.bookingId ||
@@ -689,7 +778,9 @@ export default function CustomerPaymentsPage() {
                       </td>
 
                       <td className="px-5 py-4 text-muted-foreground">
-                        {formatDate(payment.paidAt || payment.createdAt)}
+                        {formatDate(
+                          payment.paidAt || payment.createdAt
+                        )}
                       </td>
 
                       <td className="px-5 py-4">
@@ -711,7 +802,7 @@ export default function CustomerPaymentsPage() {
               </table>
             </div>
 
-            {/* Mobile payment cards */}
+            {/* MOBILE PAYMENT CARDS */}
             <div className="divide-y md:hidden">
               {filteredPayments.map((payment) => (
                 <div key={payment._id} className="space-y-4 p-5">
@@ -725,8 +816,11 @@ export default function CustomerPaymentsPage() {
                         <h3 className="font-semibold">
                           {getServiceName(payment)}
                         </h3>
+
                         <p className="mt-1 text-xs text-muted-foreground">
-                          {formatDate(payment.paidAt || payment.createdAt)}
+                          {formatDate(
+                            payment.paidAt || payment.createdAt
+                          )}
                         </p>
                       </div>
                     </div>
@@ -738,6 +832,7 @@ export default function CustomerPaymentsPage() {
                     <span className="text-sm text-muted-foreground">
                       Amount
                     </span>
+
                     <span className="text-lg font-bold">
                       {formatAmount(payment)}
                     </span>
@@ -747,6 +842,7 @@ export default function CustomerPaymentsPage() {
                     <span className="text-xs text-muted-foreground">
                       Transaction ID
                     </span>
+
                     <span className="max-w-[180px] truncate font-mono text-xs">
                       {getTransactionId(payment)}
                     </span>
@@ -765,7 +861,7 @@ export default function CustomerPaymentsPage() {
           </>
         )}
 
-        {/* Results count */}
+        {/* RESULTS COUNT */}
         {!loading && filteredPayments.length > 0 && (
           <div className="border-t px-5 py-4 text-xs text-muted-foreground">
             Showing {filteredPayments.length} of {payments.length} transactions
@@ -773,7 +869,10 @@ export default function CustomerPaymentsPage() {
         )}
       </div>
 
-      {/* Payment details modal */}
+      {/* ========================================
+          PAYMENT DETAILS MODAL
+      ======================================== */}
+
       {selectedPayment && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
@@ -783,11 +882,13 @@ export default function CustomerPaymentsPage() {
             className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border bg-card shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
+            {/* MODAL HEADER */}
             <div className="flex items-center justify-between border-b p-5">
               <div>
                 <h2 className="text-lg font-bold">
                   Payment Details
                 </h2>
+
                 <p className="mt-1 text-xs text-muted-foreground">
                   Transaction information
                 </p>
@@ -802,6 +903,7 @@ export default function CustomerPaymentsPage() {
               </button>
             </div>
 
+            {/* MODAL CONTENT */}
             <div className="space-y-5 p-5">
               <div className="rounded-2xl bg-primary/5 p-5 text-center">
                 <p className="text-sm text-muted-foreground">
@@ -847,6 +949,15 @@ export default function CustomerPaymentsPage() {
                 />
 
                 <PaymentDetailItem
+                  icon={<Wallet size={17} />}
+                  label="Currency"
+                  value={
+                    selectedPayment.currency?.toUpperCase() ||
+                    "Not available"
+                  }
+                />
+
+                <PaymentDetailItem
                   icon={<CalendarDays size={17} />}
                   label="Payment Date"
                   value={formatDate(
@@ -863,6 +974,7 @@ export default function CustomerPaymentsPage() {
               </div>
             </div>
 
+            {/* MODAL FOOTER */}
             <div className="border-t p-5">
               <button
                 onClick={() => setSelectedPayment(null)}
@@ -878,15 +990,16 @@ export default function CustomerPaymentsPage() {
   );
 }
 
-// ------------------------------------
-// Reusable payment detail item
-// ------------------------------------
+// ========================================
+// REUSABLE PAYMENT DETAIL ITEM
+// ========================================
+
 function PaymentDetailItem({
   icon,
   label,
   value,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
   value: string;
 }) {
@@ -898,7 +1011,10 @@ function PaymentDetailItem({
 
       <div className="min-w-0 flex-1">
         <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="mt-1 break-all text-sm font-medium">{value}</p>
+
+        <p className="mt-1 break-all text-sm font-medium">
+          {value}
+        </p>
       </div>
     </div>
   );

@@ -46,6 +46,7 @@ interface Booking {
   serviceTitle: string;
   category: string;
   servicePrice: number;
+  currency?: "USD";
   serviceImage?: string;
   technicianName: string;
   technicianEmail: string;
@@ -102,12 +103,37 @@ const formatDate = (date?: string) => {
   });
 };
 
+// USD currency formatter
 const formatMoney = (amount?: number) => {
-  if (amount === undefined || amount === null) {
+  if (
+    amount === undefined ||
+    amount === null ||
+    !Number.isFinite(Number(amount))
+  ) {
     return "Not set yet";
   }
 
-  return `৳${amount.toLocaleString("en-BD")}`;
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(amount));
+};
+
+// Validate USD amounts
+const isValidUsdAmount = (amount?: number) => {
+  if (
+    amount === undefined ||
+    amount === null ||
+    !Number.isFinite(Number(amount)) ||
+    Number(amount) < 1 ||
+    Math.round(Number(amount) * 100) / 100 !== Number(amount)
+  ) {
+    return false;
+  }
+
+  return true;
 };
 
 // ========================================
@@ -297,12 +323,10 @@ export default function CustomerBookingsPage() {
       return;
     }
 
-    if (
-      booking.finalAmount === undefined ||
-      !Number.isFinite(Number(booking.finalAmount)) ||
-      Number(booking.finalAmount) <= 0
-    ) {
-      setActionError("The final repair amount is not available.");
+    if (!isValidUsdAmount(booking.finalAmount)) {
+      setActionError(
+        "The final repair amount must be at least $1.00 USD with a maximum of 2 decimal places."
+      );
       return;
     }
 
@@ -956,11 +980,7 @@ export default function CustomerBookingsPage() {
                         onClick={() => handlePayment(selectedBooking)}
                         disabled={
                           payingId === selectedBooking._id ||
-                          selectedBooking.finalAmount === undefined ||
-                          !Number.isFinite(
-                            Number(selectedBooking.finalAmount)
-                          ) ||
-                          selectedBooking.finalAmount <= 0
+                          !isValidUsdAmount(selectedBooking.finalAmount)
                         }
                         className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
                       >

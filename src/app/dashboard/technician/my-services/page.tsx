@@ -12,12 +12,13 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle2,
-  
   Package,
 } from "lucide-react";
 import { toast } from "react-toastify";
+
 import { getTokenFromClient } from "@/lib/(getToken)/getTokenFromClient";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 interface Service {
   _id: string;
@@ -26,6 +27,7 @@ interface Service {
   description: string;
   image: string;
   basePrice: number;
+  currency?: string;
   estimatedDuration: string;
   serviceMode: string;
   serviceArea: string;
@@ -34,10 +36,25 @@ interface Service {
   createdAt: string;
 }
 
-const statusStyles = {
+interface ServicesResponse {
+  success: boolean;
+  message?: string;
+  data?: Service[] | { services?: Service[] };
+}
+
+const statusStyles: Record<string, string> = {
   pending: "bg-amber-100 text-amber-700",
   approved: "bg-green-100 text-green-700",
   rejected: "bg-red-100 text-red-700",
+};
+
+const formatUSD = (amount: number) => {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
 };
 
 export default function MyServicesPage() {
@@ -45,79 +62,25 @@ export default function MyServicesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-const fetchServices = useCallback(async (showLoading = true) => {
-  if (showLoading) {
-    setLoading(true);
-  }
-
-  try {
-    const token = await getTokenFromClient();
-
-    if (!token) {
-      throw new Error("Please sign in to view your services.");
+  // Fetch technician services.
+  const fetchServices = useCallback(async (showLoading = true) => {
+    if (showLoading) {
+      setLoading(true);
     }
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-
-    if (!apiUrl) {
-      throw new Error("Backend API URL is not configured.");
-    }
-
-    const response = await fetch(
-      `${apiUrl.replace(/\/$/, "")}/api/services/my-services`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        cache: "no-store",
-      }
-    );
-
-    const result = await response.json();
-
-    if (!response.ok || !result.success) {
-      throw new Error(
-        result.message || "Failed to load your services."
-      );
-    }
-
-    setServices(result.data);
-    setError("");
-  } catch (err) {
-    const message =
-      err instanceof Error
-        ? err.message
-        : "Something went wrong.";
-
-    setError(message);
-    toast.error(message);
-  } finally {
-    setLoading(false);
-  }
-}, []);
-const handleRefresh = () => {
-  void fetchServices(true);
-};
-useEffect(() => {
-  let cancelled = false;
-
-  const loadServices = async () => {
     try {
+      if (!API_URL) {
+        throw new Error("Backend API URL is not configured.");
+      }
+
       const token = await getTokenFromClient();
 
       if (!token) {
         throw new Error("Please sign in to view your services.");
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-
-      if (!apiUrl) {
-        throw new Error("Backend API URL is not configured.");
-      }
-
       const response = await fetch(
-        `${apiUrl.replace(/\/$/, "")}/api/services/my-services`,
+        `${API_URL.replace(/\/+$/, "")}/api/services/my-services`,
         {
           method: "GET",
           headers: {
@@ -127,38 +90,106 @@ useEffect(() => {
         }
       );
 
-      const result = await response.json();
+      const result: ServicesResponse = await response.json();
 
       if (!response.ok || !result.success) {
-        throw new Error(result.message || "Failed to load your services.");
+        throw new Error(
+          result.message || "Failed to load your services."
+        );
       }
 
-      if (!cancelled) {
-        setServices(result.data);
-        setError("");
-      }
+      const serviceData = Array.isArray(result.data)
+        ? result.data
+        : result.data?.services ?? [];
+
+      setServices(serviceData);
+      setError("");
     } catch (err) {
-      if (!cancelled) {
-        const message =
-          err instanceof Error ? err.message : "Something went wrong.";
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Something went wrong.";
 
-        setError(message);
-        toast.error(message);
-      }
+      setError(message);
+      toast.error(message);
     } finally {
-      if (!cancelled) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
+  }, []);
+
+  // Initial loading.
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadServices = async () => {
+      try {
+        if (!API_URL) {
+          throw new Error("Backend API URL is not configured.");
+        }
+
+        const token = await getTokenFromClient();
+
+        if (!token) {
+          throw new Error("Please sign in to view your services.");
+        }
+
+        const response = await fetch(
+          `${API_URL.replace(/\/+$/, "")}/api/services/my-services`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+          }
+        );
+
+        const result: ServicesResponse = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(
+            result.message || "Failed to load your services."
+          );
+        }
+
+        const serviceData = Array.isArray(result.data)
+          ? result.data
+          : result.data?.services ?? [];
+
+        if (!cancelled) {
+          setServices(serviceData);
+          setError("");
+        }
+      } catch (err) {
+        if (!cancelled) {
+          const message =
+            err instanceof Error
+              ? err.message
+              : "Something went wrong.";
+
+          setError(message);
+          toast.error(message);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadServices();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Refresh services.
+  const handleRefresh = () => {
+    void fetchServices(true);
   };
 
-  void loadServices();
-
-  return () => {
-    cancelled = true;
-  };
-}, []);
-
+  // Summary statistics.
   const pendingCount = services.filter(
     (service) => service.approvalStatus === "pending"
   ).length;
@@ -173,23 +204,30 @@ useEffect(() => {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
-
       {/* Heading */}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h2 className="text-2xl font-bold text-foreground">
             My Services
           </h2>
+
           <p className="mt-1 text-sm text-muted">
             Manage and track all the repair services you have published.
           </p>
         </div>
 
         <div className="flex gap-3">
-          <button onClick={handleRefresh}>
-  <RefreshCw size={16} />
-  Refresh
-</button>
+          <button
+            onClick={handleRefresh}
+            disabled={loading}
+            className="flex h-11 items-center justify-center gap-2 rounded-xl border border-border bg-surface px-4 text-sm font-semibold text-foreground transition hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <RefreshCw
+              size={16}
+              className={loading ? "animate-spin" : ""}
+            />
+            Refresh
+          </button>
 
           <Link
             href="/dashboard/technician/add-service"
@@ -202,7 +240,7 @@ useEffect(() => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-2xl border border-border bg-surface p-5">
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium text-muted">
@@ -210,6 +248,7 @@ useEffect(() => {
             </p>
             <Wrench className="text-primary" size={21} />
           </div>
+
           <p className="mt-3 text-3xl font-bold text-foreground">
             {services.length}
           </p>
@@ -222,6 +261,7 @@ useEffect(() => {
             </p>
             <CheckCircle2 className="text-green-600" size={21} />
           </div>
+
           <p className="mt-3 text-3xl font-bold text-foreground">
             {approvedCount}
           </p>
@@ -234,8 +274,22 @@ useEffect(() => {
             </p>
             <Clock className="text-amber-500" size={21} />
           </div>
+
           <p className="mt-3 text-3xl font-bold text-foreground">
             {pendingCount}
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-surface p-5">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-muted">
+              Rejected
+            </p>
+            <AlertCircle className="text-red-500" size={21} />
+          </div>
+
+          <p className="mt-3 text-3xl font-bold text-foreground">
+            {rejectedCount}
           </p>
         </div>
       </div>
@@ -246,6 +300,7 @@ useEffect(() => {
           <h3 className="text-lg font-bold text-foreground">
             Published Services
           </h3>
+
           <p className="text-sm text-muted">
             {services.length} services
           </p>
@@ -258,6 +313,7 @@ useEffect(() => {
               size={32}
               className="animate-spin text-primary"
             />
+
             <p className="mt-3 text-sm text-muted">
               Loading your services...
             </p>
@@ -268,10 +324,13 @@ useEffect(() => {
         {!loading && error && (
           <div className="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-border bg-surface p-6 text-center">
             <AlertCircle size={36} className="text-red-500" />
+
             <h3 className="mt-3 font-semibold text-foreground">
               Unable to load services
             </h3>
+
             <p className="mt-1 text-sm text-muted">{error}</p>
+
             <button
               onClick={handleRefresh}
               className="mt-4 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-hover"
@@ -287,13 +346,16 @@ useEffect(() => {
             <div className="rounded-2xl bg-primary/10 p-4 text-primary">
               <Package size={32} />
             </div>
+
             <h3 className="mt-4 text-lg font-bold text-foreground">
               No Services Yet
             </h3>
+
             <p className="mt-2 max-w-sm text-sm text-muted">
               You haven&apos;t published any repair services yet.
               Add your first service to get started.
             </p>
+
             <Link
               href="/dashboard/technician/add-service"
               className="mt-5 flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover"
@@ -315,11 +377,17 @@ useEffect(() => {
                 <div className="flex flex-col sm:flex-row">
                   {/* Image */}
                   <div className="h-52 w-full shrink-0 bg-background sm:h-auto sm:w-40">
-                    <img
-                      src={service.image}
-                      alt={service.title}
-                      className="h-full w-full object-cover"
-                    />
+                    {service.image ? (
+                      <img
+                        src={service.image}
+                        alt={service.title}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full min-h-40 items-center justify-center text-muted">
+                        <Package size={36} />
+                      </div>
+                    )}
                   </div>
 
                   {/* Details */}
@@ -361,7 +429,8 @@ useEffect(() => {
 
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
                       <p className="text-lg font-bold text-primary">
-                        ${service.basePrice.toFixed(2)}
+                        {formatUSD(Number(service.basePrice) || 0)}
+
                         <span className="ml-1 text-xs font-normal text-muted">
                           starting
                         </span>

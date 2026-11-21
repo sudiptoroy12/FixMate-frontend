@@ -1,7 +1,8 @@
 
 "use client";
 
-import {  useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { ElementType } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -30,7 +31,12 @@ interface Booking {
   problemDescription: string;
   preferredDate: string;
   preferredTime: string;
-  status: "pending" | "accepted" | "rejected" | "in-progress" | "completed";
+  status:
+    | "pending"
+    | "accepted"
+    | "rejected"
+    | "in-progress"
+    | "completed";
   createdAt: string;
 }
 
@@ -47,7 +53,10 @@ interface Payment {
 interface ApiResponse<T> {
   success: boolean;
   message?: string;
-  data: T;
+  data?: T | {
+    bookings?: Booking[];
+    payments?: Payment[];
+  };
 }
 
 const statusStyles: Record<string, string> = {
@@ -66,18 +75,32 @@ const statusLabels: Record<string, string> = {
   completed: "Completed",
 };
 
-const formatDate = (date: string) => {
+const formatDate = (date?: string) => {
   if (!date) return "Date unavailable";
 
-  return new Date(date).toLocaleDateString("en-BD", {
+  const parsedDate = new Date(date);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return "Date unavailable";
+  }
+
+  return parsedDate.toLocaleDateString("en-US", {
     day: "numeric",
     month: "short",
     year: "numeric",
   });
 };
 
-const getPaymentAmount = (payment: Payment) =>
-  payment.amount ?? payment.totalAmount ?? 0;
+// Only accept payments explicitly recorded in USD.
+// This prevents old BDT payments from being displayed as USD.
+const isUsdPayment = (payment: Payment) =>
+  payment.currency?.toUpperCase() === "USD";
+
+const getPaymentAmount = (payment: Payment) => {
+  const amount = Number(payment.amount ?? payment.totalAmount ?? 0);
+
+  return Number.isFinite(amount) && amount >= 0 ? amount : 0;
+};
 
 const isSuccessfulPayment = (payment: Payment) => {
   const status = (
@@ -90,10 +113,11 @@ const isSuccessfulPayment = (payment: Payment) => {
 };
 
 const formatMoney = (amount: number) =>
-  new Intl.NumberFormat("en-BD", {
+  new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "BDT",
-    maximumFractionDigits: 0,
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(amount);
 
 function StatCard({
@@ -106,7 +130,7 @@ function StatCard({
   title: string;
   value: string | number;
   description: string;
-  icon: React.ElementType;
+  icon: ElementType;
   iconStyle: string;
 }) {
   return (
@@ -114,9 +138,11 @@ function StatCard({
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-medium text-muted">{title}</p>
+
           <h3 className="mt-3 text-2xl font-bold text-foreground sm:text-3xl">
             {value}
           </h3>
+
           <p className="mt-2 text-xs text-muted">{description}</p>
         </div>
 
@@ -156,93 +182,100 @@ export default function CustomerDashboardPage() {
   const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // Load customer bookings and payment history.
+  useEffect(() => {
+    let ignore = false;
 
-useEffect(() => {
-  let ignore = false;
+    const loadDashboard = async () => {
+      await Promise.resolve();
 
-  const loadDashboard = async () => {
-    // Defer execution so state updates never happen synchronously
-    // during the effect's execution.
-    await Promise.resolve();
+      try {
+        if (!API_URL) {
+          throw new Error("API URL is not configured.");
+        }
 
-    try {
-      if (!API_URL) {
-        throw new Error("API URL is not configured.");
+        const token = await getTokenFromClient();
+
+        if (!token) {
+          throw new Error("Please sign in to view your dashboard.");
+        }
+
+        const headers = {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        };
+
+        const [bookingResponse, paymentResponse] = await Promise.all([
+          fetch(`${API_URL}/api/service-requests/customer`, {
+            method: "GET",
+            headers,
+            cache: "no-store",
+          }),
+
+          fetch(`${API_URL}/api/payments/customer`, {
+            method: "GET",
+            headers,
+            cache: "no-store",
+          }),
+        ]);
+
+        const bookingResult: ApiResponse<Booking[]> =
+          await bookingResponse.json();
+
+        const paymentResult: ApiResponse<Payment[]> =
+          await paymentResponse.json();
+
+        if (!bookingResponse.ok || !bookingResult.success) {
+          throw new Error(
+            bookingResult.message || "Unable to load your bookings."
+          );
+        }
+
+        if (!paymentResponse.ok || !paymentResult.success) {
+          throw new Error(
+            paymentResult.message || "Unable to load your payments."
+          );
+        }
+
+        const bookingData = bookingResult.data;
+        const paymentData = paymentResult.data;
+
+        const bookingList = Array.isArray(bookingData)
+          ? bookingData
+          : bookingData?.bookings ?? [];
+
+        const paymentList = Array.isArray(paymentData)
+          ? paymentData
+          : paymentData?.payments ?? [];
+
+        if (!ignore) {
+          setBookings(bookingList);
+          setPayments(paymentList);
+          setError("");
+        }
+      } catch (err) {
+        if (!ignore) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Something went wrong while loading your dashboard."
+          );
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
       }
+    };
 
-      const token = await getTokenFromClient();
+    void loadDashboard();
 
-      const headers = {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      };
+    return () => {
+      ignore = true;
+    };
+  }, [refreshKey]);
 
-      const [bookingResponse, paymentResponse] = await Promise.all([
-        fetch(`${API_URL}/api/service-requests/customer`, {
-          method: "GET",
-          headers,
-          cache: "no-store",
-        }),
-
-        fetch(`${API_URL}/api/payments/customer`, {
-          method: "GET",
-          headers,
-          cache: "no-store",
-        }),
-      ]);
-
-      const bookingResult: ApiResponse<Booking[]> =
-        await bookingResponse.json();
-
-      const paymentResult: ApiResponse<Payment[]> =
-        await paymentResponse.json();
-
-      if (!bookingResponse.ok || !bookingResult.success) {
-        throw new Error(
-          bookingResult.message || "Unable to load your bookings."
-        );
-      }
-
-      if (!paymentResponse.ok || !paymentResult.success) {
-        throw new Error(
-          paymentResult.message || "Unable to load your payments."
-        );
-      }
-
-      if (!ignore) {
-        setBookings(
-          Array.isArray(bookingResult.data) ? bookingResult.data : []
-        );
-
-        setPayments(
-          Array.isArray(paymentResult.data) ? paymentResult.data : []
-        );
-
-        setError("");
-      }
-    } catch (err) {
-      if (!ignore) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Something went wrong while loading your dashboard."
-        );
-      }
-    } finally {
-      if (!ignore) {
-        setLoading(false);
-      }
-    }
-  };
-
-  void loadDashboard();
-
-  return () => {
-    ignore = true;
-  };
-}, [refreshKey]);
-
-
+  // Calculate dashboard statistics.
   const stats = useMemo(() => {
     const pending = bookings.filter(
       (booking) => booking.status === "pending"
@@ -252,9 +285,16 @@ useEffect(() => {
       (booking) => booking.status === "completed"
     ).length;
 
+    // Only successful USD payments are included.
     const totalPaid = payments
-      .filter(isSuccessfulPayment)
-      .reduce((total, payment) => total + getPaymentAmount(payment), 0);
+      .filter(
+        (payment) =>
+          isSuccessfulPayment(payment) && isUsdPayment(payment)
+      )
+      .reduce(
+        (total, payment) => total + getPaymentAmount(payment),
+        0
+      );
 
     return {
       totalBookings: bookings.length,
@@ -264,6 +304,7 @@ useEffect(() => {
     };
   }, [bookings, payments]);
 
+  // Get the five most recent bookings.
   const recentBookings = useMemo(
     () =>
       [...bookings]
@@ -350,6 +391,7 @@ useEffect(() => {
             <h2 className="text-lg font-bold text-foreground">
               Overview
             </h2>
+
             <p className="mt-1 text-sm text-muted">
               Your repair activity at a glance.
             </p>
@@ -358,6 +400,7 @@ useEffect(() => {
           <button
             onClick={handleRefresh}
             title="Refresh dashboard"
+            aria-label="Refresh dashboard"
             className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-surface text-muted transition hover:bg-surface-hover hover:text-primary"
           >
             <RefreshCw size={17} />
@@ -392,7 +435,7 @@ useEffect(() => {
           <StatCard
             title="Total Payments"
             value={formatMoney(stats.totalPaid)}
-            description="Your successful payments"
+            description="Your successful USD payments"
             icon={CreditCard}
             iconStyle="bg-accent text-primary"
           />
@@ -406,6 +449,7 @@ useEffect(() => {
             <h2 className="text-lg font-bold text-foreground">
               Recent Bookings
             </h2>
+
             <p className="mt-1 text-sm text-muted">
               Keep track of your latest repair requests.
             </p>
@@ -470,6 +514,7 @@ useEffect(() => {
                             booking.serviceTitle ||
                             "Repair Service"}
                         </p>
+
                         <p className="mt-1 text-xs text-muted">
                           #{booking._id.slice(-8)}
                         </p>
@@ -514,6 +559,7 @@ useEffect(() => {
                           booking.serviceTitle ||
                           "Repair Service"}
                       </h3>
+
                       <p className="mt-1 text-xs text-muted">
                         #{booking._id.slice(-8)}
                       </p>
@@ -564,6 +610,7 @@ useEffect(() => {
           <h2 className="text-lg font-bold text-foreground">
             Quick Actions
           </h2>
+
           <p className="mt-1 text-sm text-muted">
             Quickly access the things you need.
           </p>
@@ -582,6 +629,7 @@ useEffect(() => {
               <h3 className="font-semibold text-foreground">
                 Browse Services
               </h3>
+
               <p className="mt-1 text-xs text-muted">
                 Find the right repair service.
               </p>
@@ -605,6 +653,7 @@ useEffect(() => {
               <h3 className="font-semibold text-foreground">
                 My Bookings
               </h3>
+
               <p className="mt-1 text-xs text-muted">
                 Check your repair progress.
               </p>
@@ -628,6 +677,7 @@ useEffect(() => {
               <h3 className="font-semibold text-foreground">
                 Payment History
               </h3>
+
               <p className="mt-1 text-xs text-muted">
                 Review your transactions.
               </p>
@@ -652,6 +702,7 @@ useEffect(() => {
             <h3 className="text-sm font-semibold text-foreground">
               Need a repair?
             </h3>
+
             <p className="mt-1 text-xs text-muted">
               Get help from a verified FixMate technician.
             </p>

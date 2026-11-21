@@ -92,6 +92,17 @@ const handleSubmit = async (
     serviceMode: String(formData.get("serviceMode") ?? ""),
     serviceArea: String(formData.get("serviceArea") ?? "").trim(),
   };
+  if (
+  !Number.isFinite(serviceData.basePrice) ||
+  serviceData.basePrice < 1 ||
+  Math.round(serviceData.basePrice * 100) / 100 !==
+    serviceData.basePrice
+) {
+  toast.error(
+    "Service price must be at least $1.00 USD with a maximum of 2 decimal places."
+  );
+  return;
+}
 
   if (
     !serviceData.title ||
@@ -255,21 +266,32 @@ if (!token) {
             </select>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-foreground">
-              Starting Price (USD) *
-            </label>
+         <div className="space-y-2">
+  <label className="text-sm font-semibold text-foreground">
+    Starting Price (USD) *
+  </label>
 
-            <input
-              name="basePrice"
-              type="number"
-              min="0.01"
-              step="0.01"
-              required
-              placeholder="e.g. 25"
-              className={inputClass}
-            />
-          </div>
+  <div className="relative">
+    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted">
+      $
+    </span>
+
+    <input
+      name="basePrice"
+      type="number"
+      min="1"
+      max="999999.99"
+      step="0.01"
+      required
+      placeholder="e.g. 25.00"
+      className={`${inputClass} pl-9`}
+    />
+  </div>
+
+  <p className="text-xs text-muted">
+    Minimum service price is $1.00 USD.
+  </p>
+</div>
         </div>
 
         {/* Description */}

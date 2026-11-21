@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "react-toastify";
+import { DollarSign, CreditCard } from "lucide-react";
 
 import TechnicianStats from "@/app/components/dashboard/technician/TechnicianStats";
 import RecentRequests from "@/app/components/dashboard/technician/RecentRequests";
@@ -42,78 +43,143 @@ export interface ServiceRequest {
   updatedAt: string;
 }
 
+interface Earnings {
+  totalEarnings: number;
+  totalPayments: number;
+  currency: string;
+}
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+const formatUSD = (amount: number) => {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+};
 
 export default function TechnicianDashboardPage() {
   const [services, setServices] = useState<TechnicianService[]>([]);
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
+
+  const [earnings, setEarnings] = useState<Earnings>({
+    totalEarnings: 0,
+    totalPayments: 0,
+    currency: "USD",
+  });
+
   const [loading, setLoading] = useState(true);
 
- const fetchDashboardData = useCallback(async () => {
-  try {
-    if (!API_URL) {
-      throw new Error("API URL is not configured.");
-    }
+  const fetchDashboardData = useCallback(async () => {
+    try {
+      if (!API_URL) {
+        throw new Error("API URL is not configured.");
+      }
 
-    const token = await getTokenFromClient();
+      const token = await getTokenFromClient();
 
-    const headers = {
-      Authorization: `Bearer ${token}`,
-    };
+      if (!token) {
+        throw new Error("Please sign in to view your dashboard.");
+      }
 
-    const [servicesResponse, requestsResponse] = await Promise.all([
-      fetch(`${API_URL}/api/services/my-services`, {
-        method: "GET",
-        headers,
-        cache: "no-store",
-      }),
+      const headers = {
+        Authorization: `Bearer ${token}`,
+      };
 
-      fetch(`${API_URL}/api/service-requests/technician`, {
-        method: "GET",
-        headers,
-        cache: "no-store",
-      }),
-    ]);
+      // Fetch all dashboard data simultaneously
+      const [
+        servicesResponse,
+        requestsResponse,
+        earningsResponse,
+      ] = await Promise.all([
+        fetch(`${API_URL}/api/services/my-services`, {
+          method: "GET",
+          headers,
+          cache: "no-store",
+        }),
 
-    const [servicesResult, requestsResult] = await Promise.all([
-      servicesResponse.json(),
-      requestsResponse.json(),
-    ]);
+        fetch(`${API_URL}/api/service-requests/technician`, {
+          method: "GET",
+          headers,
+          cache: "no-store",
+        }),
 
-    if (!servicesResponse.ok || !servicesResult.success) {
-      throw new Error(
-        servicesResult.message || "Failed to fetch your services."
+        fetch(`${API_URL}/api/payments/technician`, {
+          method: "GET",
+          headers,
+          cache: "no-store",
+        }),
+      ]);
+
+      const [
+        servicesResult,
+        requestsResult,
+        earningsResult,
+      ] = await Promise.all([
+        servicesResponse.json(),
+        requestsResponse.json(),
+        earningsResponse.json(),
+      ]);
+
+      // Validate services response
+      if (!servicesResponse.ok || !servicesResult.success) {
+        throw new Error(
+          servicesResult.message || "Failed to fetch your services."
+        );
+      }
+
+      // Validate requests response
+      if (!requestsResponse.ok || !requestsResult.success) {
+        throw new Error(
+          requestsResult.message ||
+            "Failed to fetch service requests."
+        );
+      }
+
+      // Validate earnings response
+      if (!earningsResponse.ok || !earningsResult.success) {
+        throw new Error(
+          earningsResult.message ||
+            "Failed to fetch technician earnings."
+        );
+      }
+
+      setServices(servicesResult.data || []);
+      setRequests(requestsResult.data || []);
+
+      setEarnings({
+        totalEarnings: Number(
+          earningsResult.data?.totalEarnings
+        ) || 0,
+
+        totalPayments: Number(
+          earningsResult.data?.totalPayments
+        ) || 0,
+
+        currency: earningsResult.data?.currency || "USD",
+      });
+    } catch (error) {
+      console.error("Technician dashboard error:", error);
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to load dashboard data."
       );
+    } finally {
+      setLoading(false);
     }
+  }, []);
 
-    if (!requestsResponse.ok || !requestsResult.success) {
-      throw new Error(
-        requestsResult.message || "Failed to fetch service requests."
-      );
-    }
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchDashboardData();
+    }, 0);
 
-    setServices(servicesResult.data || []);
-    setRequests(requestsResult.data || []);
-  } catch (error) {
-    console.error("Technician dashboard error:", error);
-
-    toast.error(
-      error instanceof Error
-        ? error.message
-        : "Failed to load dashboard data."
-    );
-  } finally {
-    setLoading(false);
-  }
-}, []);
-
-useEffect(() => {
-  const timer = setTimeout(() => {
-    fetchDashboardData();
-  }, 0);
-
-  return () => clearTimeout(timer);
-}, [fetchDashboardData]);
+    return () => clearTimeout(timer);
+  }, [fetchDashboardData]);
 
   return (
     <div className="space-y-8">
@@ -134,31 +200,83 @@ useEffect(() => {
         </div>
 
         <button
-  onClick={() => {
-    setLoading(true);
-    fetchDashboardData();
-  }}
-  disabled={loading}
-  className="rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
->
-  {loading ? "Refreshing..." : "Refresh Dashboard"}
-</button>
+          onClick={() => {
+            setLoading(true);
+            fetchDashboardData();
+          }}
+          disabled={loading}
+          className="rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {loading ? "Refreshing..." : "Refresh Dashboard"}
+        </button>
       </div>
 
       {/* Statistics */}
       <TechnicianStats
         totalServices={services.length}
         requestedRequests={
-          requests.filter((request) => request.status === "requested").length
+          requests.filter(
+            (request) => request.status === "requested"
+          ).length
         }
         acceptedRequests={
-          requests.filter((request) => request.status === "accepted").length
+          requests.filter(
+            (request) => request.status === "accepted"
+          ).length
         }
         completedJobs={
-          requests.filter((request) => request.status === "completed").length
+          requests.filter(
+            (request) => request.status === "completed"
+          ).length
         }
         loading={loading}
       />
+
+      {/* Total Earnings */}
+      <section className="rounded-2xl border border-border bg-surface p-5 shadow-sm">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/10">
+              <DollarSign
+                size={28}
+                className="text-emerald-600"
+              />
+            </div>
+
+            <div>
+              <p className="text-sm font-medium text-muted">
+                Total Earnings
+              </p>
+
+              {loading ? (
+                <div className="mt-2 h-8 w-36 animate-pulse rounded-lg bg-surface-secondary" />
+              ) : (
+                <h3 className="mt-1 text-3xl font-bold text-foreground">
+                  {formatUSD(earnings.totalEarnings)}
+                </h3>
+              )}
+
+              <p className="mt-1 text-xs text-muted">
+                Successful payments received in USD
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 rounded-xl bg-surface-secondary px-4 py-3">
+            <CreditCard size={18} className="text-primary" />
+
+            <div>
+              <p className="text-xs text-muted">
+                Successful Payments
+              </p>
+
+              <p className="text-lg font-bold text-foreground">
+                {loading ? "..." : earnings.totalPayments}
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Recent Requests */}
       <div className="grid grid-cols-1 gap-6">

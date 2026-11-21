@@ -53,6 +53,7 @@ interface ServiceRequest {
 
   paymentStatus: "unpaid" | "paid";
   finalAmount?: number;
+  currency?: string;
 
   createdAt: string;
   updatedAt: string;
@@ -75,6 +76,15 @@ const paymentStyles: Record<ServiceRequest["paymentStatus"], string> = {
   paid: "bg-green-100 text-green-700",
 };
 
+const formatUSD = (amount: number) => {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+};
+
 export default function TechnicianRequestsPage() {
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,148 +93,171 @@ export default function TechnicianRequestsPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [selectedRequest, setSelectedRequest] =
     useState<ServiceRequest | null>(null);
-    const [finalAmount, setFinalAmount] = useState("");
+
+  const [finalAmount, setFinalAmount] = useState("");
 
   // Fetch technician requests
- const fetchRequests = useCallback(async () => {
-  try {
-    if (!API_URL) {
-      throw new Error("API URL is not configured.");
-    }
-
-    const token = await getTokenFromClient();
-
-    const response = await fetch(
-      `${API_URL}/api/service-requests/technician`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        cache: "no-store",
+  const fetchRequests = useCallback(async () => {
+    try {
+      if (!API_URL) {
+        throw new Error("API URL is not configured.");
       }
-    );
 
-    const result = await response.json();
+      const token = await getTokenFromClient();
 
-    if (!response.ok || !result.success) {
-      throw new Error(
-        result.message || "Failed to fetch service requests."
+      if (!token) {
+        throw new Error("Authentication failed. Please sign in again.");
+      }
+
+      const response = await fetch(
+        `${API_URL}/api/service-requests/technician`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          cache: "no-store",
+        }
       );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message || "Failed to fetch service requests."
+        );
+      }
+
+      setRequests(result.data || []);
+    } catch (error) {
+      console.error("Fetch requests error:", error);
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Something went wrong!"
+      );
+    } finally {
+      setLoading(false);
     }
+  }, []);
 
-    setRequests(result.data || []);
-  } catch (error) {
-    console.error("Fetch requests error:", error);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchRequests();
+    }, 0);
 
-    toast.error(
-      error instanceof Error
-        ? error.message
-        : "Something went wrong!"
-    );
-  } finally {
-    setLoading(false);
-  }
-}, []);
-
-useEffect(() => {
-  const timer = setTimeout(() => {
-    fetchRequests();
-  }, 0);
-
-  return () => clearTimeout(timer);
-}, [fetchRequests]);
+    return () => clearTimeout(timer);
+  }, [fetchRequests]);
 
   // Update request status
- const handleStatusUpdate = async (
-  id: string,
-  status: ServiceRequest["status"],
-  amount?: number
-) => {
-  try {
-    if (!API_URL) {
-      throw new Error("API URL is not configured.");
-    }
-
-    if (status === "completed" && (!amount || amount <= 0)) {
-      toast.error("Please enter a valid final amount.");
-      return;
-    }
-
-    setUpdatingId(id);
-
-    const token = await getTokenFromClient();
-
-    const response = await fetch(
-      `${API_URL}/api/service-requests/${id}/status`,
-      {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          status,
-          ...(status === "completed" && { finalAmount: amount }),
-        }),
+  const handleStatusUpdate = async (
+    id: string,
+    status: ServiceRequest["status"],
+    amount?: number
+  ) => {
+    try {
+      if (!API_URL) {
+        throw new Error("API URL is not configured.");
       }
-    );
 
-    const result = await response.json();
+      // Validate final repair amount in USD
+      if (status === "completed") {
+        if (
+          amount === undefined ||
+          !Number.isFinite(amount) ||
+          amount < 1 ||
+          Math.round(amount * 100) / 100 !== amount
+        ) {
+          toast.error(
+            "Final repair amount must be at least $1.00 USD with a maximum of 2 decimal places."
+          );
+          return;
+        }
+      }
 
-    if (!response.ok || !result.success) {
-      throw new Error(
-        result.message || "Failed to update request."
+      setUpdatingId(id);
+
+      const token = await getTokenFromClient();
+
+      if (!token) {
+        throw new Error("Authentication failed. Please sign in again.");
+      }
+
+      const response = await fetch(
+        `${API_URL}/api/service-requests/${id}/status`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            status,
+            ...(status === "completed" && {
+              finalAmount: amount,
+            }),
+          }),
+        }
       );
-    }
 
-    toast.success(
-      result.message || "Request updated successfully!"
-    );
+      const result = await response.json();
 
-    setRequests((previous) =>
-      previous.map((request) =>
-        request._id === id
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message || "Failed to update request."
+        );
+      }
+
+      toast.success(
+        result.message || "Request updated successfully!"
+      );
+
+      setRequests((previous) =>
+        previous.map((request) =>
+          request._id === id
+            ? {
+                ...request,
+                status,
+                ...(status === "completed" && {
+                  finalAmount: amount,
+                  paymentStatus: "unpaid" as const,
+                  currency: "USD",
+                }),
+              }
+            : request
+        )
+      );
+
+      setSelectedRequest((previous) =>
+        previous?._id === id
           ? {
-              ...request,
+              ...previous,
               status,
               ...(status === "completed" && {
                 finalAmount: amount,
                 paymentStatus: "unpaid" as const,
+                currency: "USD",
               }),
             }
-          : request
-      )
-    );
+          : previous
+      );
 
-    setSelectedRequest((previous) =>
-      previous?._id === id
-        ? {
-            ...previous,
-            status,
-            ...(status === "completed" && {
-              finalAmount: amount,
-              paymentStatus: "unpaid" as const,
-            }),
-          }
-        : previous
-    );
+      if (status === "completed") {
+        setFinalAmount("");
+      }
+    } catch (error) {
+      console.error("Update request error:", error);
 
-    if (status === "completed") {
-      setFinalAmount("");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Something went wrong!"
+      );
+    } finally {
+      setUpdatingId(null);
     }
-  } catch (error) {
-    console.error("Update request error:", error);
-
-    toast.error(
-      error instanceof Error
-        ? error.message
-        : "Something went wrong!"
-    );
-  } finally {
-    setUpdatingId(null);
-  }
-};
+  };
 
   // Search and filter
   const filteredRequests = useMemo(() => {
@@ -292,7 +325,11 @@ useEffect(() => {
     });
   };
 
-  const renderActions = (request: ServiceRequest, modal = false) => {
+  // Request action buttons
+  const renderActions = (
+    request: ServiceRequest,
+    modal = false
+  ) => {
     const isUpdating = updatingId === request._id;
 
     const buttonClass =
@@ -309,7 +346,11 @@ useEffect(() => {
               }
               className={`${buttonClass} bg-[#102b25] text-[#b9e769]`}
             >
-              {isUpdating ? "Updating..." : modal ? "Accept Request" : "Accept"}
+              {isUpdating
+                ? "Updating..."
+                : modal
+                  ? "Accept Request"
+                  : "Accept"}
             </button>
 
             <button
@@ -336,27 +377,32 @@ useEffect(() => {
           </button>
         )}
 
-       {request.status === "in-progress" && (
-  <button
-    disabled={isUpdating}
-    onClick={() => {
-      if (modal) {
-        const amount = Number(finalAmount);
-        handleStatusUpdate(request._id, "completed", amount);
-      } else {
-        setFinalAmount("");
-        setSelectedRequest(request);
-      }
-    }}
-    className={`${buttonClass} bg-green-600 text-white`}
-  >
-    {isUpdating
-      ? "Updating..."
-      : modal
-        ? "Mark as Completed"
-        : "Complete"}
-  </button>
-)}
+        {request.status === "in-progress" && (
+          <button
+            disabled={isUpdating}
+            onClick={() => {
+              if (modal) {
+                const amount = Number(finalAmount);
+
+                handleStatusUpdate(
+                  request._id,
+                  "completed",
+                  amount
+                );
+              } else {
+                setFinalAmount("");
+                setSelectedRequest(request);
+              }
+            }}
+            className={`${buttonClass} bg-green-600 text-white`}
+          >
+            {isUpdating
+              ? "Updating..."
+              : modal
+                ? "Mark as Completed"
+                : "Complete"}
+          </button>
+        )}
       </>
     );
   };
@@ -381,19 +427,19 @@ useEffect(() => {
         </div>
 
         <button
-  onClick={() => {
-    setLoading(true);
-    fetchRequests();
-  }}
-  disabled={loading}
-  className="flex items-center justify-center gap-2 rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-accent disabled:opacity-50"
->
-  <RefreshCw
-    size={17}
-    className={loading ? "animate-spin" : ""}
-  />
-  Refresh
-</button>
+          onClick={() => {
+            setLoading(true);
+            fetchRequests();
+          }}
+          disabled={loading}
+          className="flex items-center justify-center gap-2 rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-accent disabled:opacity-50"
+        >
+          <RefreshCw
+            size={17}
+            className={loading ? "animate-spin" : ""}
+          />
+          Refresh
+        </button>
       </div>
 
       {/* Statistics */}
@@ -408,7 +454,9 @@ useEffect(() => {
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted">{stat.title}</p>
+                  <p className="text-sm text-muted">
+                    {stat.title}
+                  </p>
 
                   <h2 className="mt-2 text-3xl font-bold text-foreground">
                     {stat.value}
@@ -496,7 +544,10 @@ useEffect(() => {
         ) : filteredRequests.length === 0 ? (
           <div className="flex min-h-72 flex-col items-center justify-center px-5 text-center">
             <div className="rounded-2xl bg-[#b9e769]/20 p-5">
-              <ClipboardList size={35} className="text-[#5c9635]" />
+              <ClipboardList
+                size={35}
+                className="text-[#5c9635]"
+              />
             </div>
 
             <h3 className="mt-4 text-lg font-bold text-foreground">
@@ -521,7 +572,9 @@ useEffect(() => {
                     <th className="px-5 py-4">Date</th>
                     <th className="px-5 py-4">Status</th>
                     <th className="px-5 py-4">Payment</th>
-                    <th className="px-5 py-4 text-right">Actions</th>
+                    <th className="px-5 py-4 text-right">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
 
@@ -574,7 +627,9 @@ useEffect(() => {
                       <td className="px-5 py-5">
                         <div className="flex justify-end gap-2">
                           <button
-                            onClick={() => setSelectedRequest(request)}
+                            onClick={() =>
+                              setSelectedRequest(request)
+                            }
                             title="View details"
                             className="rounded-lg border border-border p-2 text-foreground hover:bg-accent"
                           >
@@ -629,7 +684,9 @@ useEffect(() => {
 
                   <div className="mt-4 flex flex-wrap gap-2">
                     <button
-                      onClick={() => setSelectedRequest(request)}
+                      onClick={() =>
+                        setSelectedRequest(request)
+                      }
                       className="flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-foreground"
                     >
                       <Eye size={15} />
@@ -700,7 +757,9 @@ useEffect(() => {
               {/* Information Cards */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="rounded-xl bg-background p-4">
-                  <p className="text-xs text-muted">Customer Name</p>
+                  <p className="text-xs text-muted">
+                    Customer Name
+                  </p>
 
                   <p className="mt-1 font-semibold text-foreground">
                     {selectedRequest.customerName}
@@ -708,7 +767,9 @@ useEffect(() => {
                 </div>
 
                 <div className="rounded-xl bg-background p-4">
-                  <p className="text-xs text-muted">Phone Number</p>
+                  <p className="text-xs text-muted">
+                    Phone Number
+                  </p>
 
                   <p className="mt-1 flex items-center gap-2 font-semibold text-foreground">
                     <Phone size={15} />
@@ -717,15 +778,19 @@ useEffect(() => {
                 </div>
 
                 <div className="rounded-xl bg-background p-4">
-                  <p className="text-xs text-muted">Service Price</p>
+                  <p className="text-xs text-muted">
+                    Service Price (USD)
+                  </p>
 
                   <p className="mt-1 font-semibold text-foreground">
-                    ৳{selectedRequest.servicePrice}
+                    {formatUSD(selectedRequest.servicePrice)}
                   </p>
                 </div>
 
                 <div className="rounded-xl bg-background p-4">
-                  <p className="text-xs text-muted">Preferred Date</p>
+                  <p className="text-xs text-muted">
+                    Preferred Date
+                  </p>
 
                   <p className="mt-1 font-semibold text-foreground">
                     {formatDate(selectedRequest.preferredDate)}
@@ -733,7 +798,9 @@ useEffect(() => {
                 </div>
 
                 <div className="rounded-xl bg-background p-4">
-                  <p className="text-xs text-muted">Request Status</p>
+                  <p className="text-xs text-muted">
+                    Request Status
+                  </p>
 
                   <p className="mt-1 font-semibold text-foreground">
                     {formatStatus(selectedRequest.status)}
@@ -741,7 +808,9 @@ useEffect(() => {
                 </div>
 
                 <div className="rounded-xl bg-background p-4">
-                  <p className="text-xs text-muted">Payment Status</p>
+                  <p className="text-xs text-muted">
+                    Payment Status
+                  </p>
 
                   <p className="mt-1 flex items-center gap-2 font-semibold text-foreground">
                     <CreditCard size={15} />
@@ -785,48 +854,60 @@ useEffect(() => {
                 </p>
               </div>
 
-             {/* Final Amount Input */}
-{selectedRequest.status === "in-progress" && (
-  <div className="rounded-xl border border-green-200 bg-green-50 p-4">
-    <label
-      htmlFor="finalAmount"
-      className="mb-2 block text-sm font-semibold text-green-900"
-    >
-      Final Repair Amount (৳)
-    </label>
+              {/* Final Amount Input */}
+              {selectedRequest.status === "in-progress" && (
+                <div className="rounded-xl border border-green-200 bg-green-50 p-4">
+                  <label
+                    htmlFor="finalAmount"
+                    className="mb-2 block text-sm font-semibold text-green-900"
+                  >
+                    Final Repair Amount (USD)
+                  </label>
 
-    <input
-      id="finalAmount"
-      type="number"
-      min="1"
-      step="0.01"
-      placeholder="Enter final repair amount"
-      value={finalAmount}
-      onChange={(e) => setFinalAmount(e.target.value)}
-      className="w-full rounded-lg border border-green-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
-    />
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-semibold text-gray-600">
+                      $
+                    </span>
 
-    <p className="mt-2 text-xs text-green-800">
-      Enter the total amount the customer needs to pay.
-    </p>
-  </div>
-)}
+                    <input
+                      id="finalAmount"
+                      type="number"
+                      min="1"
+                      max="999999.99"
+                      step="0.01"
+                      placeholder="e.g. 25.00"
+                      value={finalAmount}
+                      onChange={(e) =>
+                        setFinalAmount(e.target.value)
+                      }
+                      className="w-full rounded-lg border border-green-200 bg-white px-4 py-3 pl-9 text-sm text-gray-900 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
+                    />
+                  </div>
 
-{/* Final Amount Display */}
-{selectedRequest.status === "completed" &&
-  selectedRequest.finalAmount !== undefined && (
-    <div className="rounded-xl bg-background p-4">
-      <p className="text-xs text-muted">Final Repair Amount</p>
-      <p className="mt-1 text-xl font-bold text-green-600">
-        ৳{selectedRequest.finalAmount}
-      </p>
-    </div>
-  )}
+                  <p className="mt-2 text-xs text-green-800">
+                    Minimum repair amount is $1.00 USD. Maximum two decimal places.
+                  </p>
+                </div>
+              )}
 
-{/* Modal Actions */}
-<div className="flex flex-wrap gap-3 border-t border-border pt-5">
-  {renderActions(selectedRequest, true)}
-</div>
+              {/* Final Amount Display */}
+              {selectedRequest.status === "completed" &&
+                selectedRequest.finalAmount !== undefined && (
+                  <div className="rounded-xl bg-background p-4">
+                    <p className="text-xs text-muted">
+                      Final Repair Amount (USD)
+                    </p>
+
+                    <p className="mt-1 text-xl font-bold text-green-600">
+                      {formatUSD(selectedRequest.finalAmount)}
+                    </p>
+                  </div>
+                )}
+
+              {/* Modal Actions */}
+              <div className="flex flex-wrap gap-3 border-t border-border pt-5">
+                {renderActions(selectedRequest, true)}
+              </div>
             </div>
           </div>
         </div>
