@@ -44,7 +44,11 @@ interface Booking {
   _id: string;
   serviceId: string;
   serviceTitle: string;
-  category: string;
+
+  // Support the actual backend field
+  serviceCategory?: string;
+  category?: string;
+
   servicePrice: number;
   currency?: "USD";
   serviceImage?: string;
@@ -66,6 +70,8 @@ interface Booking {
 // ========================================
 // STATUS STYLES
 // ========================================
+const getBookingCategory = (booking: Booking) =>
+  booking.serviceCategory || booking.category || "Not provided";
 
 const statusStyles: Record<BookingStatus, string> = {
   requested: "bg-warning/10 text-warning",
@@ -313,6 +319,7 @@ export default function CustomerBookingsPage() {
   // ========================================
 
   const handlePayment = async (booking: Booking) => {
+    if (payingId) return;
     if (booking.status !== "completed") {
       setActionError("Only completed bookings can be paid.");
       return;
@@ -673,7 +680,7 @@ export default function CustomerBookingsPage() {
                       </td>
 
                       <td className="px-6 py-5 text-sm text-muted">
-                        {booking.category || "Not provided"}
+                        {getBookingCategory(booking)}
                       </td>
 
                       <td className="px-6 py-5 text-sm text-muted">
@@ -709,7 +716,7 @@ export default function CustomerBookingsPage() {
                             booking.paymentStatus === "unpaid" && (
                               <button
                                 onClick={() => handlePayment(booking)}
-                                disabled={payingId === booking._id}
+                                disabled={payingId !== null}
                                 className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
                               >
                                 {payingId === booking._id ? (
@@ -802,7 +809,8 @@ export default function CustomerBookingsPage() {
                       booking.paymentStatus === "unpaid" && (
                         <button
                           onClick={() => handlePayment(booking)}
-                          disabled={payingId === booking._id}
+                         disabled={payingId !== null}
+  
                           className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary-hover disabled:opacity-50"
                         >
                           {payingId === booking._id ? (
