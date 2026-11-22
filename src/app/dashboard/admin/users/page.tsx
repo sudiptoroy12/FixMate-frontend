@@ -21,6 +21,7 @@ import {
   Loader2,
 } from "lucide-react";
 
+import { authClient } from "@/lib/auth-client";
 import { getTokenFromClient } from "@/lib/(getToken)/getTokenFromClient";
 
 // ========================================
@@ -192,7 +193,6 @@ export default function AdminUsersPage() {
   const [selectedUser, setSelectedUser] =
     useState<AdminUser | null>(null);
 
-  // Stores the selected role before saving
   const [roleChanges, setRoleChanges] = useState<
     Record<string, UserRole>
   >({});
@@ -203,6 +203,28 @@ export default function AdminUsersPage() {
 
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+
+  // ========================================
+  // CURRENT LOGGED-IN ADMIN
+  // ========================================
+
+  const {
+    data: session,
+    isPending: sessionLoading,
+  } = authClient.useSession();
+
+  const currentUserId = session?.user?.id;
+
+  const currentUserEmail = session?.user?.email?.toLowerCase();
+
+  const isCurrentUser = (user: AdminUser) => {
+    return (
+      (!!currentUserId &&
+        String(user._id) === String(currentUserId)) ||
+      (!!currentUserEmail &&
+        user.email?.toLowerCase() === currentUserEmail)
+    );
+  };
 
   // ========================================
   // INITIAL DATA FETCH
@@ -289,6 +311,14 @@ export default function AdminUsersPage() {
   // ========================================
 
   const handleUpdateRole = async (user: AdminUser) => {
+    // Prevent changing the current admin's own role.
+    if (sessionLoading) return;
+
+    if (isCurrentUser(user)) {
+      setError("You cannot change your own role.");
+      return;
+    }
+
     const newRole = roleChanges[user._id];
 
     if (!newRole) return;
@@ -298,7 +328,9 @@ export default function AdminUsersPage() {
     }
 
     const confirmed = window.confirm(
-      `Are you sure you want to change ${user.name || user.email || "this user"}'s role to ${newRole}?`
+      `Are you sure you want to change ${
+        user.name || user.email || "this user"
+      }'s role to ${newRole}?`
     );
 
     if (!confirmed) return;
@@ -310,7 +342,7 @@ export default function AdminUsersPage() {
 
       const updatedUser = await updateUserRole(user._id, newRole);
 
-      // Update the user in the table
+      // Update the user in the table.
       setUsers((previous) =>
         previous.map((item) =>
           item._id === user._id
@@ -324,7 +356,7 @@ export default function AdminUsersPage() {
         )
       );
 
-      // Update the selected user in the details modal
+      // Update the selected user in the details modal.
       setSelectedUser((previous) =>
         previous?._id === user._id
           ? {
@@ -336,7 +368,7 @@ export default function AdminUsersPage() {
           : previous
       );
 
-      // Remove the saved draft for this user
+      // Remove the saved draft for this user.
       setRoleChanges((previous) => {
         const updated = { ...previous };
         delete updated[user._id];
@@ -639,6 +671,9 @@ export default function AdminUsersPage() {
                 {filteredUsers.map((user) => {
                   const currentRole = normalizeRole(user.role);
 
+                  // Check whether this is the logged-in admin.
+                  const isSelf = isCurrentUser(user);
+
                   const selectedRole =
                     roleChanges[user._id] ??
                     (currentRole === "unknown"
@@ -688,7 +723,15 @@ export default function AdminUsersPage() {
 
                       {/* Current Role */}
                       <td className="px-5 py-4">
-                        <RoleBadge role={user.role} />
+                        <div className="flex flex-col items-start gap-2">
+                          <RoleBadge role={user.role} />
+
+                          {isSelf && (
+                            <span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary">
+                              You
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Change Role */}
@@ -702,9 +745,15 @@ export default function AdminUsersPage() {
                                 e.target.value as UserRole
                               )
                             }
-                            disabled={isUpdating}
-                            aria-label={`Change role for ${user.name || user.email}`}
-                            className="min-w-[130px] rounded-lg border border-border bg-surface-secondary px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary disabled:cursor-not-allowed disabled:opacity-60"
+                            disabled={
+                              isSelf ||
+                              isUpdating ||
+                              sessionLoading
+                            }
+                            aria-label={`Change role for ${
+                              user.name || user.email
+                            }`}
+                            className="min-w-[130px] rounded-lg border border-border bg-surface-secondary px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             {availableRoles.map((role) => (
                               <option key={role} value={role}>
@@ -718,11 +767,17 @@ export default function AdminUsersPage() {
                             type="button"
                             onClick={() => handleUpdateRole(user)}
                             disabled={
+                              isSelf ||
                               !hasRoleChanged ||
                               isUpdating ||
-                              updatingUserId !== null
+                              updatingUserId !== null ||
+                              sessionLoading
                             }
-                            title="Save role change"
+                            title={
+                              isSelf
+                                ? "You cannot change your own role"
+                                : "Save role change"
+                            }
                             className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-semibold text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             {isUpdating ? (
@@ -737,6 +792,12 @@ export default function AdminUsersPage() {
                             Update
                           </button>
                         </div>
+
+                        {isSelf && (
+                          <p className="mt-2 text-xs text-muted">
+                            You cannot change your own role.
+                          </p>
+                        )}
                       </td>
 
                       {/* Joined */}
@@ -822,6 +883,12 @@ export default function AdminUsersPage() {
                 <div className="mt-3">
                   <RoleBadge role={selectedUser.role} />
                 </div>
+
+                {isCurrentUser(selectedUser) && (
+                  <span className="mt-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                    Your account
+                  </span>
+                )}
               </div>
 
               {/* User Information */}
