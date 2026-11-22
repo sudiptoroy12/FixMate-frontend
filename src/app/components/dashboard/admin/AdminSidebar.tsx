@@ -58,7 +58,7 @@ export default function AdminSidebar({
 
   const handleLogout = async () => {
     await authClient.signOut();
-    router.push("/sign-in");
+    router.push("/signin");
     router.refresh();
   };
 
