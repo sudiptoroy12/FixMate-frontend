@@ -32,10 +32,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full ">
         <ThemeProvider>
-          <Suspense fallback={<div className="h-24" />}>
-            <Navbar />
-          </Suspense>
-
+         
           <main className="mx-auto w-full">
             {children}
           </main>

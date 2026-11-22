@@ -11,6 +11,9 @@ import {
   Home,
   LogOut,
   X,
+  UserRound,
+  UserPen,
+  ShieldCheck,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "react-toastify";
@@ -50,6 +53,9 @@ export default function TechnicianSidebar({
   const pathname = usePathname();
   const router = useRouter();
 
+  const { data: session } = authClient.useSession();
+  const user = session?.user;
+
   const handleLogout = async () => {
     try {
       await authClient.signOut();
@@ -63,6 +69,7 @@ export default function TechnicianSidebar({
 
   return (
     <>
+      {/* Mobile Overlay */}
       {isOpen && (
         <div
           onClick={onClose}
@@ -76,9 +83,9 @@ export default function TechnicianSidebar({
         }`}
       >
         {/* Logo */}
-        <div className="flex h-20 items-center justify-between border-b border-white/10 px-6">
+        <div className="flex h-20 shrink-0 items-center justify-between border-b border-white/10 px-6">
           <Link
-            href="/"
+            href="/dashboard/technician"
             className="flex items-center gap-3"
             onClick={onClose}
           >
@@ -100,8 +107,50 @@ export default function TechnicianSidebar({
           </button>
         </div>
 
+        {/* Technician Profile */}
+        <div className="border-b border-white/10 px-5 py-5">
+          <div className="flex items-center gap-3">
+            {user?.image ? (
+              <img
+                src={user.image}
+                alt={user.name || "Technician"}
+                className="h-12 w-12 shrink-0 rounded-full border-2 border-[#b9e769] object-cover"
+              />
+            ) : (
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#b9e769] text-[#102b25]">
+                <UserRound size={24} />
+              </div>
+            )}
+
+            <div className="min-w-0 flex-1">
+              <h3 className="truncate text-sm font-semibold text-white">
+                {user?.name || "Technician"}
+              </h3>
+
+              <p className="truncate text-xs text-white/50">
+                {user?.email || "Loading email..."}
+              </p>
+
+              <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[#b9e769]">
+                <ShieldCheck size={12} />
+                Technician Account
+              </span>
+            </div>
+          </div>
+
+          {/* Edit Profile */}
+          <Link
+            href="/profile"
+            onClick={onClose}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-white/15 px-3 py-2 text-xs font-semibold text-white/80 transition hover:border-[#b9e769] hover:bg-[#b9e769]/10 hover:text-[#b9e769]"
+          >
+            <UserPen size={14} />
+            Edit Profile
+          </Link>
+        </div>
+
         {/* Menu */}
-        <div className="flex-1 px-4 py-7">
+        <div className="flex-1 overflow-y-auto px-4 py-7">
           <p className="mb-4 px-3 text-xs font-semibold uppercase tracking-widest text-gray-400">
             Technician Panel
           </p>
@@ -109,7 +158,11 @@ export default function TechnicianSidebar({
           <nav className="space-y-2">
             {menuItems.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname === item.href;
+
+              const isActive =
+                pathname === item.href ||
+                (item.href !== "/dashboard/technician" &&
+                  pathname.startsWith(item.href));
 
               return (
                 <Link
@@ -131,9 +184,10 @@ export default function TechnicianSidebar({
         </div>
 
         {/* Bottom Links */}
-        <div className="space-y-2 border-t border-white/10 p-4">
+        <div className="shrink-0 space-y-2 border-t border-white/10 p-4">
           <Link
             href="/"
+            onClick={onClose}
             className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm text-gray-300 transition hover:bg-white/10 hover:text-white"
           >
             <Home size={19} />
