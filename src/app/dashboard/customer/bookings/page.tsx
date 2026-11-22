@@ -231,13 +231,49 @@ export default function CustomerBookingsPage() {
   }, [refreshKey]);
 
   // ========================================
-  // REFRESH BOOKINGS
-  // ========================================
+// FETCH CUSTOMER BOOKINGS
+// ========================================
 
-  const handleRefresh = () => {
-    setLoading(true);
+useEffect(() => {
+  let ignore = false;
+
+  const loadBookings = async () => {
+    // Your existing fetch logic
+  };
+
+  loadBookings();
+
+  return () => {
+    ignore = true;
+  };
+}, [refreshKey]);
+
+// ========================================
+// REFRESH BOOKINGS WHEN CUSTOMER RETURNS
+// ========================================
+
+useEffect(() => {
+  const handleFocus = () => {
     setRefreshKey((previous) => previous + 1);
   };
+
+  window.addEventListener("focus", handleFocus);
+
+  return () => {
+    window.removeEventListener("focus", handleFocus);
+  };
+}, []);
+
+// ========================================
+// REFRESH BOOKINGS
+// ========================================
+
+const handleRefresh = () => {
+  setLoading(true);
+  setRefreshKey((previous) => previous + 1);
+};
+
+
 
   // ========================================
   // CANCEL BOOKING
