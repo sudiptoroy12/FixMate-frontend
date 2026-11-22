@@ -118,7 +118,7 @@ export default async function FeaturedServices() {
                       </p>
 
                       <p className="mt-1 text-2xl font-bold text-primary">
-                        ৳{service.basePrice.toLocaleString("en-BD")}
+                        ${service.basePrice.toLocaleString("en-BD")}
                       </p>
                     </div>
 

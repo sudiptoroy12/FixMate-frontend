@@ -1,122 +1,223 @@
 
-import {
-  Wrench,
-  Hammer,
-  Settings,
-  Sparkles,
-} from "lucide-react";
+import Link from "next/link";
+import { Wrench, Menu, Search, Bell, UserRound } from "lucide-react";
+
+function Skeleton({
+  className = "",
+}: {
+  className?: string;
+}) {
+  return (
+    <div
+      className={`animate-pulse rounded-lg bg-gray-200 dark:bg-gray-800 ${className}`}
+    />
+  );
+}
 
 export default function Loading() {
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-5 py-12 text-foreground">
-
-      {/* Background Decorations */}
-      <div className="pointer-events-none absolute -right-40 top-10 h-96 w-96 rounded-full bg-primary/10 blur-3xl" />
-      <div className="pointer-events-none absolute -left-40 bottom-0 h-80 w-80 rounded-full bg-lime-500/10 blur-3xl" />
-
-      <div className="relative w-full max-w-2xl">
-
-        {/* Main Loading Card */}
-        <div className="overflow-hidden rounded-[2rem] border border-border bg-surface p-7 shadow-xl shadow-black/5 sm:p-12">
-
+    <main className="min-h-screen overflow-hidden bg-[#F8FAF8] dark:bg-[#0B1220]">
+      {/* Navbar Skeleton */}
+      <header className="sticky top-0 z-30 border-b border-gray-200 bg-white/90 backdrop-blur-xl dark:border-gray-800 dark:bg-gray-950/90">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           {/* Logo */}
-          <div className="mb-12 flex items-center justify-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
-              <Wrench size={25} />
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-lime-500/10">
+              <Wrench className="h-5 w-5 text-lime-600" />
             </div>
 
-            <h1 className="text-2xl font-extrabold tracking-tight text-foreground">
-              Fix<span className="text-primary">Mate</span>
-            </h1>
-          </div>
-
-          {/* Animated Illustration */}
-          <div className="relative mx-auto flex h-48 w-48 items-center justify-center">
-
-            {/* Outer Circle */}
-            <div className="absolute inset-0 animate-[spin_12s_linear_infinite] rounded-full border-2 border-dashed border-primary/20" />
-
-            {/* Middle Circle */}
-            <div className="absolute inset-5 rounded-full border border-lime-500/30" />
-
-            {/* Glow */}
-            <div className="absolute inset-8 rounded-full bg-primary/10 blur-2xl" />
-
-            {/* Main Tool */}
-            <div className="relative z-10 flex h-28 w-28 animate-pulse items-center justify-center rounded-[2rem] bg-primary text-primary-foreground shadow-2xl shadow-primary/25">
-              <Wrench
-                size={55}
-                strokeWidth={1.8}
-                className="animate-[spin_3s_ease-in-out_infinite]"
-              />
-            </div>
-
-            {/* Floating Tools */}
-            <div className="absolute left-0 top-8 animate-bounce rounded-xl border border-border bg-background p-3 text-primary shadow-lg">
-              <Hammer size={22} />
-            </div>
-
-            <div className="absolute bottom-8 right-0 animate-pulse rounded-xl border border-border bg-background p-3 text-lime-600 shadow-lg dark:text-lime-400">
-              <Settings size={22} />
-            </div>
-
-            {/* Sparkles */}
-            <Sparkles
-              size={20}
-              className="absolute right-5 top-2 animate-pulse text-primary"
-            />
-
-            <Sparkles
-              size={16}
-              className="absolute bottom-3 left-8 animate-pulse text-lime-500"
-            />
-          </div>
-
-          {/* Loading Text */}
-          <div className="mt-10 text-center">
-            <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-              Getting things ready
-              <span className="text-primary">...</span>
-            </h2>
-
-            <p className="mx-auto mt-3 max-w-sm text-sm leading-7 text-muted-foreground">
-              We&apos;re preparing everything for you. Please wait a moment while
-              FixMate gets things in order.
-            </p>
-          </div>
-
-          {/* Progress Bar */}
-          <div className="mx-auto mt-9 max-w-sm">
-            <div className="mb-3 flex items-center justify-between text-xs font-semibold">
-              <span className="text-muted-foreground">
-                Loading your experience
-              </span>
-
-              <span className="text-primary">
-                Please wait
-              </span>
-            </div>
-
-            <div className="h-2 overflow-hidden rounded-full bg-muted">
-              <div className="h-full w-1/2 animate-[loading_1.5s_ease-in-out_infinite] rounded-full bg-primary" />
+            <div>
+              <p className="text-xl font-extrabold tracking-tight text-gray-900 dark:text-white">
+                Fix<span className="text-lime-600">Mate</span>
+              </p>
+              <Skeleton className="mt-1 h-2 w-24" />
             </div>
           </div>
 
-          {/* Skeleton Elements */}
-          <div className="mt-10 grid grid-cols-3 gap-3">
-            <div className="h-16 animate-pulse rounded-xl bg-muted" />
-            <div className="h-16 animate-pulse rounded-xl bg-muted" />
-            <div className="h-16 animate-pulse rounded-xl bg-muted" />
-          </div>
+          {/* Desktop Navigation */}
+          <nav className="hidden items-center gap-8 lg:flex">
+            <Skeleton className="h-4 w-14" />
+            <Skeleton className="h-4 w-16" />
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-4 w-16" />
+          </nav>
 
-          {/* Footer */}
-          <div className="mt-10 border-t border-border pt-6 text-center">
-            <p className="text-xs font-medium tracking-wide text-muted-foreground">
-              FIXMATE · YOUR HOME, OUR RESPONSIBILITY
-            </p>
+          {/* Actions */}
+          <div className="flex items-center gap-3">
+            <div className="hidden h-9 w-9 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 sm:flex">
+              <Bell className="h-4 w-4 text-gray-400" />
+            </div>
+
+            <div className="hidden h-9 w-9 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 sm:flex">
+              <UserRound className="h-4 w-4 text-gray-400" />
+            </div>
+
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-800 lg:hidden">
+              <Menu className="h-5 w-5 text-gray-400" />
+            </div>
           </div>
         </div>
+      </header>
+
+      {/* Main Content */}
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+
+        {/* Hero Section */}
+        <section className="relative mb-12 overflow-hidden rounded-3xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-10 lg:p-14">
+          <div className="relative z-10 grid items-center gap-10 lg:grid-cols-2">
+
+            {/* Hero Text */}
+            <div>
+              <Skeleton className="h-8 w-48 rounded-full" />
+
+              <Skeleton className="mt-7 h-10 w-full max-w-md" />
+              <Skeleton className="mt-3 h-10 w-4/5 max-w-sm" />
+
+              <Skeleton className="mt-6 h-4 w-full max-w-md" />
+              <Skeleton className="mt-3 h-4 w-4/5 max-w-sm" />
+
+              {/* Search Bar */}
+              <div className="mt-8 flex max-w-lg items-center gap-3 rounded-2xl border border-gray-200 p-2 dark:border-gray-700">
+                <Search className="ml-2 h-5 w-5 text-gray-400" />
+                <Skeleton className="h-5 flex-1" />
+                <Skeleton className="h-11 w-24 rounded-xl" />
+              </div>
+
+              {/* Hero Stats */}
+              <div className="mt-8 flex flex-wrap gap-8">
+                <div>
+                  <Skeleton className="h-7 w-16" />
+                  <Skeleton className="mt-2 h-3 w-24" />
+                </div>
+                <div>
+                  <Skeleton className="h-7 w-16" />
+                  <Skeleton className="mt-2 h-3 w-24" />
+                </div>
+                <div>
+                  <Skeleton className="h-7 w-16" />
+                  <Skeleton className="mt-2 h-3 w-24" />
+                </div>
+              </div>
+            </div>
+
+            {/* Hero Image */}
+            <div className="relative">
+              <Skeleton className="aspect-[4/3] w-full rounded-3xl" />
+              <div className="absolute -bottom-4 -left-4 hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-lg dark:border-gray-700 dark:bg-gray-800 sm:block">
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="mt-2 h-3 w-20" />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Category Section */}
+        <section className="mb-12">
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <Skeleton className="h-7 w-48" />
+              <Skeleton className="mt-2 h-4 w-64 max-w-full" />
+            </div>
+            <Skeleton className="h-9 w-24 rounded-lg" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div
+                key={index}
+                className="rounded-2xl border border-gray-200 bg-white p-5 text-center dark:border-gray-800 dark:bg-gray-900"
+              >
+                <Skeleton className="mx-auto h-14 w-14 rounded-2xl" />
+                <Skeleton className="mx-auto mt-4 h-4 w-24 max-w-full" />
+                <Skeleton className="mx-auto mt-2 h-3 w-16" />
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Services Section */}
+        <section className="mb-12">
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <Skeleton className="h-7 w-52" />
+              <Skeleton className="mt-2 h-4 w-64 max-w-full" />
+            </div>
+            <Skeleton className="h-9 w-28 rounded-lg" />
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <article
+                key={index}
+                className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
+              >
+                {/* Service Image */}
+                <Skeleton className="aspect-[16/10] w-full rounded-none" />
+
+                <div className="p-5">
+                  <div className="flex items-center justify-between gap-3">
+                    <Skeleton className="h-5 w-32" />
+                    <Skeleton className="h-6 w-16 rounded-full" />
+                  </div>
+
+                  <Skeleton className="mt-4 h-3 w-full" />
+                  <Skeleton className="mt-2 h-3 w-4/5" />
+
+                  <div className="mt-5 flex items-center justify-between border-t border-gray-100 pt-4 dark:border-gray-800">
+                    <div>
+                      <Skeleton className="h-3 w-16" />
+                      <Skeleton className="mt-2 h-5 w-20" />
+                    </div>
+
+                    <Skeleton className="h-10 w-28 rounded-xl" />
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        {/* Bottom CTA Skeleton */}
+        <section className="mb-10 rounded-3xl border border-gray-200 bg-white p-8 dark:border-gray-800 dark:bg-gray-900 sm:p-10">
+          <div className="flex flex-col items-center justify-between gap-6 sm:flex-row">
+            <div className="w-full">
+              <Skeleton className="h-7 w-64 max-w-full" />
+              <Skeleton className="mt-3 h-4 w-full max-w-md" />
+            </div>
+            <Skeleton className="h-12 w-36 shrink-0 rounded-xl" />
+          </div>
+        </section>
       </div>
+
+      {/* Footer Skeleton */}
+      <footer className="border-t border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950">
+        <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 md:grid-cols-3 lg:px-8">
+          <div>
+            <Skeleton className="h-6 w-28" />
+            <Skeleton className="mt-4 h-3 w-full max-w-xs" />
+            <Skeleton className="mt-2 h-3 w-4/5" />
+          </div>
+
+          <div>
+            <Skeleton className="h-5 w-24" />
+            <div className="mt-4 space-y-3">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-3 w-28" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+          </div>
+
+          <div>
+            <Skeleton className="h-5 w-28" />
+            <Skeleton className="mt-4 h-3 w-full max-w-xs" />
+            <Skeleton className="mt-3 h-10 w-full max-w-xs rounded-xl" />
+          </div>
+        </div>
+
+        <div className="border-t border-gray-200 py-5 text-center dark:border-gray-800">
+          <Skeleton className="mx-auto h-3 w-48" />
+        </div>
+      </footer>
     </main>
   );
 }
