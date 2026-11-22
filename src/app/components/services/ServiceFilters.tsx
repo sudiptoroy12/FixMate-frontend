@@ -8,6 +8,8 @@ interface Props {
   setSearch: (value: string) => void;
   category: string;
   setCategory: (value: string) => void;
+  serviceMode: string;
+  setServiceMode: (value: string) => void;
   sort: string;
   setSort: (value: string) => void;
 }
@@ -28,11 +30,13 @@ export default function ServiceFilters({
   setSearch,
   category,
   setCategory,
+  serviceMode,
+  setServiceMode,
   sort,
   setSort,
 }: Props) {
   return (
-    <div className="grid grid-cols-1 gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 md:grid-cols-2 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 md:grid-cols-2 lg:grid-cols-4">
 
       {/* Search */}
       <div className="relative">
@@ -45,7 +49,7 @@ export default function ServiceFilters({
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search services..."
+          placeholder="Search by title or category..."
           className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 pl-11 pr-4 text-sm text-gray-900 outline-none transition focus:border-[#167d68] focus:ring-2 focus:ring-[#167d68]/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
         />
       </div>
@@ -65,6 +69,19 @@ export default function ServiceFilters({
         </select>
       </div>
 
+      {/* Service Mode */}
+      <div>
+        <select
+          value={serviceMode}
+          onChange={(e) => setServiceMode(e.target.value)}
+          className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 outline-none focus:border-[#167d68] dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+        >
+          <option value="">All Service Modes</option>
+          <option value="Home Visit">Home Visit</option>
+          <option value="Shop Drop-off">Shop Drop-off</option>
+        </select>
+      </div>
+
       {/* Sorting */}
       <div className="relative">
         <SlidersHorizontal
@@ -78,12 +95,10 @@ export default function ServiceFilters({
           className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 pl-11 pr-4 text-sm text-gray-700 outline-none focus:border-[#167d68] dark:border-gray-700 dark:bg-gray-800 dark:text-white"
         >
           <option value="newest">Newest First</option>
-          <option value="price-low">Price: Low to High</option>
-          <option value="price-high">Price: High to Low</option>
-          <option value="name">Name: A to Z</option>
+          <option value="price-asc">Price: Low to High</option>
+          <option value="price-desc">Price: High to Low</option>
         </select>
       </div>
-
     </div>
   );
 }

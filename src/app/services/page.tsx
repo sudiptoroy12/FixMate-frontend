@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import {
   useSearchParams,
   useRouter,
@@ -28,6 +28,8 @@ const categories = [
   "Electrical",
 ];
 
+const validSortOptions = ["newest", "price-asc", "price-desc"];
+
 function ServiceSkeleton() {
   return (
     <div className="animate-pulse overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
@@ -52,84 +54,100 @@ function ServicesPageContent() {
   const router = useRouter();
   const pathname = usePathname();
 
-  // Get selected category from URL
-  const queryCategory = searchParams.get("category");
+  // Read all filters from URL
+  const queryString = searchParams.toString();
 
-  const category =
-    queryCategory && categories.includes(queryCategory)
-      ? queryCategory
-      : "All Categories";
+  const queryCategory = searchParams.get("category") || "";
+  const search = searchParams.get("search") || "";
+  const serviceMode = searchParams.get("serviceMode") || "";
+  const querySort = searchParams.get("sort") || "newest";
+
+  const category = categories.includes(queryCategory)
+    ? queryCategory
+    : "All Categories";
+
+  const sort = validSortOptions.includes(querySort)
+    ? querySort
+    : "newest";
 
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [search, setSearch] = useState("");
-  const [sort, setSort] = useState("newest");
+  // Update URL query parameters
+  const updateFilters = (key: string, value: string) => {
+    const params = new URLSearchParams(queryString);
 
-  // Update category in URL
-  const handleCategoryChange = (value: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-
-    if (value === "All Categories") {
-      params.delete("category");
+    if (!value || value === "All Categories") {
+      params.delete(key);
     } else {
-      params.set("category", value);
+      params.set(key, value);
     }
 
-    const queryString = params.toString();
+    const newQuery = params.toString();
 
     router.replace(
-      queryString ? `${pathname}?${queryString}` : pathname,
+      newQuery ? `${pathname}?${newQuery}` : pathname,
       { scroll: false }
     );
   };
 
-  // Fetch services
-  const fetchServices = async () => {
+  // Fetch filtered services from MongoDB
+  const fetchServices = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
 
-      const data = await getAllServices();
+      const params = new URLSearchParams(queryString);
 
-      setServices(
-        data.filter(
-          (service) =>
-            service.approvalStatus === "approved" &&
-            service.isAvailable === true
-        )
-      );
+      const data = await getAllServices({
+        search: params.get("search") || "",
+        category: params.get("category") || "",
+        serviceMode: params.get("serviceMode") || "",
+        sort: validSortOptions.includes(params.get("sort") || "")
+          ? (params.get("sort") as "newest" | "price-asc" | "price-desc")
+          : "newest",
+      });
+
+      setServices(data);
     } catch (err) {
       console.error("Fetch services error:", err);
       setError("Unable to load services. Please try again.");
+      setServices([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [queryString]);
 
-  // Initial services loading
+  // Fetch whenever URL filters change
   useEffect(() => {
     let ignore = false;
 
     const loadServices = async () => {
       try {
-        const data = await getAllServices();
+        setError("");
+        setLoading(true);
+
+        const params = new URLSearchParams(queryString);
+
+        const data = await getAllServices({
+          search: params.get("search") || "",
+          category: params.get("category") || "",
+          serviceMode: params.get("serviceMode") || "",
+          sort: validSortOptions.includes(params.get("sort") || "")
+            ? (params.get("sort") as "newest" | "price-asc" | "price-desc")
+            : "newest",
+        });
 
         if (!ignore) {
-          setServices(
-            data.filter(
-              (service) =>
-                service.approvalStatus === "approved" &&
-                service.isAvailable === true
-            )
-          );
+          setServices(data);
         }
       } catch (err) {
         console.error("Fetch services error:", err);
 
         if (!ignore) {
           setError("Unable to load services. Please try again.");
+          setServices([]);
         }
       } finally {
         if (!ignore) {
@@ -143,197 +161,148 @@ function ServicesPageContent() {
     return () => {
       ignore = true;
     };
-  }, []);
-
-  // Search, category filtering and sorting
-  const filteredServices = useMemo(() => {
-    let result = [...services];
-
-    // Search
-    if (search.trim()) {
-      const keyword = search.toLowerCase();
-
-      result = result.filter(
-        (service) =>
-          service.title.toLowerCase().includes(keyword) ||
-          service.category.toLowerCase().includes(keyword) ||
-          service.technicianName.toLowerCase().includes(keyword) ||
-          service.serviceArea.toLowerCase().includes(keyword)
-      );
-    }
-
-    // Category filter
-    if (category !== "All Categories") {
-      result = result.filter(
-        (service) => service.category === category
-      );
-    }
-
-    // Sorting
-    switch (sort) {
-      case "price-low":
-        result.sort((a, b) => a.basePrice - b.basePrice);
-        break;
-
-      case "price-high":
-        result.sort((a, b) => b.basePrice - a.basePrice);
-        break;
-
-      case "name":
-        result.sort((a, b) =>
-          a.title.localeCompare(b.title)
-        );
-        break;
-
-      default:
-        result.sort(
-          (a, b) =>
-            new Date(b.createdAt).getTime() -
-            new Date(a.createdAt).getTime()
-        );
-    }
-
-    return result;
-  }, [services, search, category, sort]);
+  }, [queryString]);
 
   // Clear all filters
   const clearFilters = () => {
-    setSearch("");
-    setSort("newest");
-    handleCategoryChange("All Categories");
+    router.replace(pathname, { scroll: false });
   };
 
   return (
     <>
-    <Navbar/>
-    <main className="min-h-screen bg-gray-50 py-12 dark:bg-gray-950">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <Navbar />
 
-        {/* Header */}
-        <div className="mb-10 text-center">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-[#167d68]/10 px-4 py-2 text-sm font-semibold text-[#167d68]">
-            <Wrench size={17} />
-            Professional Repair Services
-          </div>
+      <main className="min-h-screen bg-gray-50 py-12 dark:bg-gray-950">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
 
-          <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white sm:text-4xl lg:text-5xl">
-            Find the Right
-            <span className="text-[#167d68]"> Repair Service</span>
-          </h1>
+          {/* Header */}
+          <div className="mb-10 text-center">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-[#167d68]/10 px-4 py-2 text-sm font-semibold text-[#167d68]">
+              <Wrench size={17} />
+              Professional Repair Services
+            </div>
 
-          <p className="mx-auto mt-4 max-w-2xl text-gray-600 dark:text-gray-400">
-            Explore professional repair services from experienced
-            technicians. Get reliable solutions for all your devices.
-          </p>
-        </div>
+            <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white sm:text-4xl lg:text-5xl">
+              Find the Right
+              <span className="text-[#167d68]"> Repair Service</span>
+            </h1>
 
-        {/* Search and Filters */}
-        <ServiceFilters
-          search={search}
-          setSearch={setSearch}
-          category={category}
-          setCategory={handleCategoryChange}
-          sort={sort}
-          setSort={setSort}
-        />
-
-        {/* Results Header */}
-        <div className="mb-6 mt-8 flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-              {category === "All Categories"
-                ? "Available Services"
-                : `${category} Repair Services`}
-            </h2>
-
-            {!loading && (
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                {filteredServices.length} services found
-              </p>
-            )}
-          </div>
-
-          <button
-            onClick={fetchServices}
-            disabled={loading}
-            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 transition hover:border-[#167d68] hover:text-[#167d68] disabled:opacity-50 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
-          >
-            <RefreshCw
-              size={16}
-              className={loading ? "animate-spin" : ""}
-            />
-            Refresh
-          </button>
-        </div>
-
-        {/* Loading */}
-        {loading && (
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {Array.from({ length: 8 }).map((_, index) => (
-              <ServiceSkeleton key={index} />
-            ))}
-          </div>
-        )}
-
-        {/* Error */}
-        {!loading && error && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-10 text-center dark:border-red-900 dark:bg-red-950/20">
-            <p className="font-semibold text-red-600 dark:text-red-400">
-              {error}
+            <p className="mx-auto mt-4 max-w-2xl text-gray-600 dark:text-gray-400">
+              Explore professional repair services from experienced
+              technicians. Get reliable solutions for all your devices.
             </p>
+          </div>
+
+          {/* Search and Filters */}
+          <ServiceFilters
+            search={search}
+            setSearch={(value) => updateFilters("search", value)}
+            category={category}
+            setCategory={(value) => updateFilters("category", value)}
+            serviceMode={serviceMode}
+            setServiceMode={(value) =>
+              updateFilters("serviceMode", value)
+            }
+            sort={sort}
+            setSort={(value) => updateFilters("sort", value)}
+          />
+
+          {/* Results Header */}
+          <div className="mb-6 mt-8 flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                {category === "All Categories"
+                  ? "Available Services"
+                  : `${category} Repair Services`}
+              </h2>
+
+              {!loading && !error && (
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  {services.length} services found
+                </p>
+              )}
+            </div>
 
             <button
               onClick={fetchServices}
-              className="mt-5 rounded-xl bg-[#167d68] px-6 py-3 font-semibold text-white hover:bg-[#126653]"
+              disabled={loading}
+              className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 transition hover:border-[#167d68] hover:text-[#167d68] disabled:opacity-50 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
             >
-              Try Again
-            </button>
-          </div>
-        )}
-
-        {/* Service Cards */}
-        {!loading && !error && filteredServices.length > 0 && (
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {filteredServices.map((service) => (
-              <ServiceCard
-                key={service._id}
-                service={service}
+              <RefreshCw
+                size={16}
+                className={loading ? "animate-spin" : ""}
               />
-            ))}
-          </div>
-        )}
-
-        {/* Empty State */}
-        {!loading && !error && filteredServices.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-gray-300 bg-white px-5 py-16 text-center dark:border-gray-700 dark:bg-gray-900">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#167d68]/10">
-              <Search size={30} className="text-[#167d68]" />
-            </div>
-
-            <h3 className="mt-5 text-xl font-bold text-gray-900 dark:text-white">
-              No Services Found
-            </h3>
-
-            <p className="mx-auto mt-2 max-w-md text-sm text-gray-500 dark:text-gray-400">
-              We couldn&apos;t find any services matching your search.
-              Try changing your search keyword or category.
-            </p>
-
-            <button
-              onClick={clearFilters}
-              className="mt-6 rounded-xl bg-[#167d68] px-6 py-3 font-semibold text-white transition hover:bg-[#126653]"
-            >
-              Clear Filters
+              Refresh
             </button>
           </div>
-        )}
-      </div>
-    </main>
+
+          {/* Loading */}
+          {loading && (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {Array.from({ length: 8 }).map((_, index) => (
+                <ServiceSkeleton key={index} />
+              ))}
+            </div>
+          )}
+
+          {/* Error */}
+          {!loading && error && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-10 text-center dark:border-red-900 dark:bg-red-950/20">
+              <p className="font-semibold text-red-600 dark:text-red-400">
+                {error}
+              </p>
+
+              <button
+                onClick={fetchServices}
+                className="mt-5 rounded-xl bg-[#167d68] px-6 py-3 font-semibold text-white hover:bg-[#126653]"
+              >
+                Try Again
+              </button>
+            </div>
+          )}
+
+          {/* Service Cards */}
+          {!loading && !error && services.length > 0 && (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {services.map((service) => (
+                <ServiceCard
+                  key={service._id}
+                  service={service}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Empty State */}
+          {!loading && !error && services.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-gray-300 bg-white px-5 py-16 text-center dark:border-gray-700 dark:bg-gray-900">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#167d68]/10">
+                <Search size={30} className="text-[#167d68]" />
+              </div>
+
+              <h3 className="mt-5 text-xl font-bold text-gray-900 dark:text-white">
+                No Services Found
+              </h3>
+
+              <p className="mx-auto mt-2 max-w-md text-sm text-gray-500 dark:text-gray-400">
+                We couldn&apos;t find any services matching your filters.
+                Try changing your search keyword or filters.
+              </p>
+
+              <button
+                onClick={clearFilters}
+                className="mt-6 rounded-xl bg-[#167d68] px-6 py-3 font-semibold text-white transition hover:bg-[#126653]"
+              >
+                Clear Filters
+              </button>
+            </div>
+          )}
+        </div>
+      </main>
     </>
   );
 }
 
-// Suspense boundary for useSearchParams()
 export default function ServicesPage() {
   return (
     <Suspense

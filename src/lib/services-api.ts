@@ -5,15 +5,45 @@ import { getTokenFromClient } from "./(getToken)/getTokenFromClient";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
-export async function getAllServices(): Promise<Service[]> {
+export interface ServiceFiltersParams {
+  search?: string;
+  category?: string;
+  serviceMode?: string;
+  sort?: "price-asc" | "price-desc" | "newest";
+}
+
+
+
+export async function getAllServices(
+  filters: ServiceFiltersParams = {}
+): Promise<Service[]> {
   if (!API_URL) {
     throw new Error("API URL is not configured.");
   }
 
-  const response = await fetch(`${API_URL}/api/services`, {
-    method: "GET",
-    cache: "no-store",
-  });
+  const params = new URLSearchParams();
+
+  if (filters.search?.trim()) {
+    params.set("search", filters.search.trim());
+  }
+
+  if (filters.category) {
+    params.set("category", filters.category);
+  }
+
+  if (filters.serviceMode) {
+    params.set("serviceMode", filters.serviceMode);
+  }
+
+  params.set("sort", filters.sort || "newest");
+
+  const response = await fetch(
+    `${API_URL}/api/services?${params.toString()}`,
+    {
+      method: "GET",
+      cache: "no-store",
+    }
+  );
 
   if (!response.ok) {
     throw new Error("Failed to fetch services.");
@@ -27,6 +57,7 @@ export async function getAllServices(): Promise<Service[]> {
 
   return result.data;
 }
+
 
 export async function getServiceById(id: string): Promise<Service> {
   if (!API_URL) {
