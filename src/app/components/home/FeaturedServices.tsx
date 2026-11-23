@@ -8,6 +8,7 @@ import {
   Wrench,
   Sparkles,
 } from "lucide-react";
+import { connection } from "next/server";
 
 import type { Service, ApiResponse } from "@/types/service";
 
@@ -37,6 +38,8 @@ async function getFeaturedServices(): Promise<Service[]> {
 }
 
 export default async function FeaturedServices() {
+  await connection();
+
   const services = await getFeaturedServices();
 
   return (
