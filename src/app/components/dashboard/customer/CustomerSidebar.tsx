@@ -192,7 +192,7 @@ export default function CustomerSidebar({
             className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm text-gray-300 transition hover:bg-white/10 hover:text-white"
           >
             <Globe size={19} />
-            Back to Website
+            Back to Home
           </Link>
 
           <button
